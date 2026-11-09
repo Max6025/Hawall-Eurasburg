@@ -1391,11 +1391,29 @@
   // dass man nicht mehr weiss, ob "blau" kalt oder draussen bedeutet. Und Farbe als Flaeche
   // verbietet ohnehin ADR 0004.
 
+  // Jeder Ort hat drei Zeichen (Chip-Text, Symbol oben links, Silhouette im Hintergrund) und
+  // EINE Bewegung, die zu ihm gehoert. Gewuenscht war ausdruecklich NICHT "alles dreht sich":
+  // Eine Drehung passt zur Sonne und zu sonst nichts. Die Bewegung erzaehlt deshalb je Ort
+  // etwas anderes -- aus dem Kamin steigt Rauch, die Strahlen wandern, ein Laeufer steigt die
+  // Treppe hinauf, die Stehlampe neben dem Sofa atmet. Sie laeuft als Schleife, auch auf dem
+  // Wall Display selbst, nicht nur im Bildschirmschoner.
+  //
+  // Dieselben Teile tragen in Symbol UND Silhouette dieselbe Klasse (ort-rauch, ort-strahlen,
+  // ort-laeufer, ort-schein), damit eine Regel in dashboard.css beide bewegt. Die Silhouette
+  // ist nur zu 7,5 % sichtbar; dort traegt nur, was als FORM dazukommt oder sich verschiebt
+  // (ein Rauchpuff, ein Laeufer, ein Lichtkreis), nicht eine Helligkeit innerhalb der Flaeche.
+  //
+  // `animationen`: [Name, Dauer in Sekunden, wechselnd] -- die Dauer steht ein zweites Mal in
+  // dashboard.css, siehe HVAC_ANIMATIONEN fuer die Lehre dazu und test/ort.test.js fuer die
+  // Pruefung, dass beide Seiten uebereinstimmen.
   const ORTE = {
     innen: {
       text: 'Innen',
-      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v10h13V10"/><path d="M10 20v-5.5h4V20"/></svg>',
-      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5 1.5 11.2l1.4 1.6L4.5 11.5V21h15v-9.5l1.6 1.3 1.4-1.6z"/></svg>'
+      // Der Kamin ist neu dazugekommen, als Traeger der Bewegung: Ein Haus, aus dem Rauch
+      // steigt, ist ein bewohntes Haus -- und genau das heisst "innen".
+      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" overflow="visible"><path d="M3 13.5 12 6.5l9 7"/><path d="M5.5 12v9.5h13V12"/><path d="M10 21.5V16h4v5.5"/><path d="M16 9.6V6h2.5v6"/><g class="ort-rauch" fill="currentColor" stroke="none"><circle class="r1" cx="17.25" cy="4.2" r="1.2"/><circle class="r2" cx="17.25" cy="4.2" r="1.2"/><circle class="r3" cx="17.25" cy="4.2" r="1.2"/></g></svg>',
+      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor" overflow="visible"><path d="M12 4.5 1.5 13.2l1.4 1.6 1.6-1.3V23h15v-9.5l1.6 1.3 1.4-1.6z"/><rect x="16" y="6" width="2.6" height="7"/><g class="ort-rauch"><circle class="r1" cx="17.3" cy="4.2" r="1.3"/><circle class="r2" cx="17.3" cy="4.2" r="1.3"/><circle class="r3" cx="17.3" cy="4.2" r="1.3"/></g></svg>',
+      animationen: [['rauch', 4.2, false]]
     },
     // SONNE, nicht mehr Tanne. Gemeldet wurde "nimm eins das man besser erkennt das draussen
     // gemeint ist", und das war berechtigt: Eine Tanne ist ein Baum, und ein Baum ist erst ueber
@@ -1405,10 +1423,14 @@
     //
     // Dass eine Sonne auch "sonnig" heissen koennte, faellt hier nicht ins Gewicht: Daneben
     // steht der Chip "AUSSEN", und das Gegenstueck auf der Nachbarkarte ist ein Haus.
+    //
+    // Die Strahlen wandern langsam um den Kern -- eine Umdrehung in einer Minute. Das ist die
+    // eine Stelle, an der eine Drehung das richtige Bild ist.
     aussen: {
       text: 'Außen',
-      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.3v2.1M12 19.6v2.1M2.3 12h2.1M19.6 12h2.1M5.4 5.4l1.5 1.5M17.1 17.1l1.5 1.5M18.6 5.4l-1.5 1.5M6.9 17.1l-1.5 1.5"/></svg>',
-      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5.4"/><g><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/></g></svg>'
+      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path class="ort-strahlen" d="M12 2.3v2.1M12 19.6v2.1M2.3 12h2.1M19.6 12h2.1M5.4 5.4l1.5 1.5M17.1 17.1l1.5 1.5M18.6 5.4l-1.5 1.5M6.9 17.1l-1.5 1.5"/></svg>',
+      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5.4"/><g class="ort-strahlen"><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/></g></svg>',
+      animationen: [['strahlen', 60, false]]
     },
     // TREPPENHAUS, der dritte Ort. Der Anlass: Im Haus haengen Fuehler im Wohnbereich UND im
     // Treppenhaus, und beide sind "innen" -- zwei Haeuser nebeneinander sagten nicht, welche
@@ -1418,12 +1440,44 @@
     // und Sonne zu unterscheiden -- schraeg aufsteigend, wo das Haus ein Giebel ist und die
     // Sonne rund. Der Chip ist ein Ring wie bei INNEN (es IST innen), aber gestrichelt, damit
     // auch die Pille eine eigene Form hat.
+    //
+    // Die Bewegung: ein Laeufer (ein Punkt), der Stufe fuer Stufe hinaufsteigt, oben
+    // verschwindet und unten wieder anfaengt. Die Stufen des Symbols (3,16.5 / 7.5,12 / 12,7.5 /
+    // 16.5,3) liegen 4,5 Einheiten auseinander; die Silhouette ist um 0,1 anders geteilt, das
+    // sieht man nicht.
     treppenhaus: {
       text: 'Treppenhaus',
-      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21v-4.5h4.5V12H12V7.5h4.5V3H21v18z"/></svg>',
-      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 22.5v-5h4.6v-4.6h4.6V8.3h4.6V3.7h7.2v18.8z"/></svg>'
+      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21v-4.5h4.5V12H12V7.5h4.5V3H21v18z"/><circle class="ort-laeufer" cx="5.25" cy="14.8" r="1.4" fill="currentColor" stroke="none"/></svg>',
+      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 22.5v-5h4.6v-4.6h4.6V8.3h4.6V3.7h7.2v18.8z"/><circle class="ort-laeufer" cx="3.8" cy="15.6" r="1.5"/></svg>',
+      animationen: [['laeufer', 6, false]]
+    },
+    // WOHNZIMMER, der vierte Ort. Gewuenscht als eigener Raum neben "innen": Das Sofa ist das
+    // Zeichen, an dem jeder den Raum erkennt. Die Bewegung ist die Stehlampe daneben, deren
+    // Lichtschein langsam an- und abschwillt -- das Zimmer, in dem man abends sitzt.
+    wohnzimmer: {
+      text: 'Wohnzimmer',
+      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V8.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2V11"/><path d="M2 13a2 2 0 0 1 4 0v2h7v-2a2 2 0 0 1 4 0v5H2z"/><path d="M4 20v1.5M15 20v1.5"/><circle class="ort-schein" cx="20.5" cy="9.3" r="3.8" fill="currentColor" stroke="none"/><path d="M20.5 21.5V11M18.5 21.5h4"/><path d="M17.5 11l1.2-4.5h3.6l1.2 4.5z"/></svg>',
+      // Die Silhouette haengt rechts unten ueber den Kartenrand hinaus (right: -4 %); die Lampe
+      // steht deshalb nicht am rechten Rand des Bildes, sondern bei x = 17, sonst ist sie weg.
+      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5.5" width="10" height="7.5" rx="2"/><path d="M0.5 13.5a2.2 2.2 0 0 1 4.4 0v1.6h6.2v-1.6a2.2 2.2 0 0 1 4.4 0v7H0.5z"/><rect x="2.2" y="20.5" width="1.6" height="2.3"/><rect x="12.2" y="20.5" width="1.6" height="2.3"/><circle class="ort-schein" cx="17.6" cy="8.8" r="4.2"/><rect x="17" y="11" width="1.3" height="11"/><rect x="15.4" y="21.3" width="4.5" height="1.4"/><path d="M14.3 11.3l1.3-5h3.9l1.3 5z"/></svg>',
+      animationen: [['schein', 3.2, true]]
     }
   };
+
+  /**
+   * style-Text fuer eine Karte mit Ort: je Bewegung ein Startversatz aus der Uhrzeit, als
+   * CSS-Variable (--ph-rauch, --ph-strahlen, ...). Gesetzt wird er auf der KARTE, nicht auf
+   * dem Symbol: Die Variable erbt, und so bewegen sich Symbol oben links und Silhouette im
+   * Hintergrund im selben Takt -- und nach einem Neuaufbau der Karte geht es dort weiter, wo
+   * es war (siehe animationsPhase).
+   */
+  function ortPhasenStil(ort, jetztMs) {
+    const eintrag = ORTE[ort];
+    if (!eintrag || !eintrag.animationen) return '';
+    return eintrag.animationen
+      .map(([name, dauer, wechselnd]) => '--ph-' + name + ':' + animationsPhase(dauer, wechselnd, jetztMs))
+      .join(';');
+  }
 
   // Woerter, an denen sich der Ort erkennen laesst. Geprueft wird in Beschriftung UND Kennung --
   // "sensor.aussentemperatur" genuegt, auch wenn die Karte "Temperatur" heisst.
@@ -1433,12 +1487,16 @@
     // Vor "innen": "Treppenhaus Flur" ist ein Messpunkt im Treppenhaus, nicht irgendwo innen.
     [['treppenhaus', 'treppe', 'stiegenhaus', 'stiege', 'staircase', 'stairwell', 'stairway',
       'stairs'], 'treppenhaus'],
-    [['innen', 'indoor', 'inside', 'wohnzimmer', 'schlafzimmer', 'kinderzimmer', 'kueche',
+    // Ebenfalls vor "innen": "Wohnzimmer" war bis 1.0.29 ein Ratewort fuer innen.
+    [['wohnzimmer', 'wohnbereich', 'wohnraum', 'stube', 'living room', 'living_room',
+      'livingroom', 'lounge'], 'wohnzimmer'],
+    [['innen', 'indoor', 'inside', 'schlafzimmer', 'kinderzimmer', 'kueche',
       'küche', 'bad', 'buero', 'büro', 'flur', 'keller', 'zimmer', 'wohnung'], 'innen']
   ];
 
   /**
-   * Der Ort einer Messkarte: 'innen', 'aussen', 'treppenhaus' oder '' (keiner).
+   * Der Ort einer Messkarte: ein Schluessel aus ORTE ('innen', 'aussen', 'treppenhaus',
+   * 'wohnzimmer') oder '' (keiner).
    *
    * Eine ausdrueckliche Einstellung gewinnt immer, auch 'kein' -- wer die Markierung abschaltet,
    * soll sie nicht zurueckbekommen, weil zufaellig "bad" im Namen steht ("Badewasser"...).
@@ -3287,6 +3345,11 @@
       umriss.setAttribute('aria-hidden', 'true');
       umriss.innerHTML = ORTE[ort].silhouette;
       card.insertBefore(umriss, card.firstChild);
+      // Der Takt der Bewegung, aus der Uhr -- fuer Symbol und Silhouette zugleich.
+      for (const teil of ortPhasenStil(ort).split(';')) {
+        const [name, wert] = teil.split(':');
+        if (name && wert) card.style.setProperty(name, wert);
+      }
     }
 
     // Das Detailfenster. NACH allen Kartenzweigen, damit kein Zweig den Zuhoerer ueberschreibt,
@@ -3594,7 +3657,7 @@
     defaultCardType, allowedCardTypes, defaultSize, buildCard,
     sizeToSpan, minSpanFor, clampSpan, resolveSpan, schonerSpanne, SCHONER_SPALTEN, SCHONER_ZEILEN, thresholdColor,
     domainsForType, typesForEntity, renderClockNow, sensorAkzente, SENSOR_FARBEN, SENSOR_FARBEN_HELL, isSolar,
-    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE,
+    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil,
     sensornameDeutsch, SENSORNAMEN,
     ORT_TYPEN_WAHL,
     DETAIL_TYPEN,

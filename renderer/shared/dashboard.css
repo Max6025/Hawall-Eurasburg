@@ -370,9 +370,9 @@ body { background: var(--page-bg-image, none) center/cover fixed, var(--bg); }
    Akzent schon nach dem Wert, eine zweite Farbbedeutung wuerde beide unlesbar machen.
 
    1. Der Chip: groesser als ein Zustands-Chip und in Grossbuchstaben. AUSSEN ist GEFUELLT,
-      INNEN nur umrandet, TREPPENHAUS gestrichelt umrandet -- eine helle Pille gegen einen
-      Ring erkennt man, lange bevor man das Wort lesen kann.
-   2. Das Symbol oben links (Haus / Sonne / Treppe) -- das macht dashboard-render.js.
+      INNEN nur umrandet, TREPPENHAUS gestrichelt, WOHNZIMMER mit Doppelring -- eine helle
+      Pille gegen einen Ring erkennt man, lange bevor man das Wort lesen kann.
+   2. Das Symbol oben links (Haus / Sonne / Treppe / Sofa) -- das macht dashboard-render.js.
    3. Die Silhouette: dasselbe Zeichen, gross und blass hinter dem Wert. Sie ist das, was aus
       fuenf Metern noch traegt. */
 .card .row-rechts { display: flex; align-items: center; gap: 0.8vh; min-width: 0; }
@@ -402,10 +402,16 @@ body { background: var(--page-bg-image, none) center/cover fixed, var(--bg); }
   color: var(--text);
   background: transparent;
 }
+.card.ort-wohnzimmer .ort-chip {
+  border: 4px double color-mix(in srgb, var(--text) 70%, transparent);
+  color: var(--text);
+  background: transparent;
+}
 /* Das Symbol oben links traegt beim Ort die Textfarbe, nicht den Akzent: Ein rotes Haus
    hiesse "innen UND warm", und genau diese Vermischung soll nicht passieren. Der Akzent
    bleibt dem Wert. */
-.card.ort-innen .row .icon, .card.ort-aussen .row .icon, .card.ort-treppenhaus .row .icon { color: var(--text); opacity: 0.85; }
+.card.ort-innen .row .icon, .card.ort-aussen .row .icon, .card.ort-treppenhaus .row .icon,
+.card.ort-wohnzimmer .row .icon { color: var(--text); opacity: 0.85; }
 
 .card .ort-silhouette {
   position: absolute; z-index: 0; pointer-events: none;
@@ -415,6 +421,69 @@ body { background: var(--page-bg-image, none) center/cover fixed, var(--bg); }
 }
 .card .ort-silhouette svg { width: 100%; height: 100%; display: block; }
 body.light-theme .card .ort-silhouette { opacity: 0.09; }
+
+/* --- Die Bewegung der Ortszeichen -------------------------------------------------------------
+   Je Ort EINE Bewegung, die zu seinem Zeichen gehoert (siehe ORTE in dashboard-render.js) --
+   nicht "alles dreht sich". Die Regeln gelten fuer das Symbol oben links UND die Silhouette,
+   weil beide dieselben Klassen tragen. Die Startversaetze (--ph-*) setzt die Karte aus der
+   Uhrzeit, sonst spraenge die Bewegung bei jedem Neuaufbau zurueck (siehe HVAC). Die Dauern
+   stehen in ORTE ein zweites Mal -- test/ort.test.js prueft, dass sie uebereinstimmen.
+
+   Alle Bewegungen sind langsam. Ein Wandpanel haengt den ganzen Tag im Blick; was dort zappelt,
+   nervt nach einer Stunde. */
+
+/* Innen: Rauch steigt aus dem Kamin. Drei Puffs, je um ein Drittel versetzt, so reisst die
+   Fahne nie ab. Jeder Puff wird beim Aufsteigen groesser und duenner. */
+.card .ort-rauch circle {
+  transform-box: fill-box; transform-origin: center;
+  animation: ort-rauch 4.2s ease-out infinite;
+  animation-delay: var(--ph-rauch, 0s);
+  opacity: 0;
+}
+.card .ort-rauch .r2 { animation-delay: calc(var(--ph-rauch, 0s) + 1.4s); }
+.card .ort-rauch .r3 { animation-delay: calc(var(--ph-rauch, 0s) + 2.8s); }
+@keyframes ort-rauch {
+  0%   { opacity: 0;   transform: translate(0, 0.5px) scale(0.6); }
+  15%  { opacity: 0.9; }
+  100% { opacity: 0;   transform: translate(1.2px, -5.5px) scale(1.5); }
+}
+
+/* Aussen: Die Strahlen wandern um den Kern, eine Umdrehung in einer Minute. */
+.card .ort-strahlen {
+  transform-box: view-box; transform-origin: 12px 12px;
+  animation: ort-strahlen 60s linear infinite;
+  animation-delay: var(--ph-strahlen, 0s);
+}
+@keyframes ort-strahlen { to { transform: rotate(360deg); } }
+
+/* Treppenhaus: Der Laeufer steigt Stufe fuer Stufe (4,5 Einheiten je Stufe), verweilt kurz
+   auf jeder, verschwindet oben und faengt unten wieder an. */
+.card .ort-laeufer {
+  animation: ort-laeufer 6s ease-in-out infinite;
+  animation-delay: var(--ph-laeufer, 0s);
+}
+@keyframes ort-laeufer {
+  0%        { opacity: 0; transform: translate(0, 0); }
+  6%, 20%   { opacity: 1; transform: translate(0, 0); }
+  28%, 42%  { opacity: 1; transform: translate(4.5px, -4.5px); }
+  50%, 64%  { opacity: 1; transform: translate(9px, -9px); }
+  72%, 86%  { opacity: 1; transform: translate(13.5px, -13.5px); }
+  92%, 100% { opacity: 0; transform: translate(13.5px, -13.5px); }
+}
+
+/* Wohnzimmer: Der Schein der Stehlampe schwillt an und ab -- atmen, nicht blinken. */
+.card .ort-schein {
+  animation: ort-schein 3.2s ease-in-out infinite alternate;
+  animation-delay: var(--ph-schein, 0s);
+}
+@keyframes ort-schein { from { opacity: 0.08; } to { opacity: 0.5; } }
+.card .ort-silhouette .ort-schein { animation-name: ort-schein-silhouette; }
+@keyframes ort-schein-silhouette { from { opacity: 0; } to { opacity: 1; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .card .ort-rauch circle, .card .ort-strahlen, .card .ort-laeufer, .card .ort-schein { animation: none; }
+  .card .ort-rauch circle { opacity: 0; }
+}
 
 /* Leichte Schrift statt halbfett: Das ist derselbe Zug wie bei der Ueberschrift des
    Ankunftsschirms -- grosse Zahlen wirken dadurch ruhig statt marktschreierisch. */

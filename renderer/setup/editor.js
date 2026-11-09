@@ -712,16 +712,19 @@ function openSettings(entityId) {
         ${opt('aussen', 'Außen')}
         ${opt('innen', 'Innen')}
         ${opt('treppenhaus', 'Innen – Treppenhaus')}
+        ${opt('wohnzimmer', 'Innen – Wohnzimmer')}
         ${opt('kein', 'Keine Angabe')}
       </select>
       <p style="font-size:1.1vh; color:var(--muted); margin:0.4vh 0 1vh;">
         Zwei Temperaturkarten sahen bisher gleich aus – der Unterschied stand nur in der
         kleinsten Schrift. Mit Ort bekommt die Karte ein Zeichen, das man aus der Entfernung
-        an der <strong>Form</strong> erkennt: Haus, Sonne oder Treppe, und ein Chip „INNEN“
-        (Ring), „AUSSEN“ (gefüllt) bzw. „TREPPENHAUS“ (gestrichelter Ring).</p>
+        an der <strong>Form</strong> erkennt: Haus, Sonne, Treppe oder Sofa, und ein Chip
+        „INNEN“ (Ring), „AUSSEN“ (gefüllt), „TREPPENHAUS“ (gestrichelt) bzw. „WOHNZIMMER“
+        (Doppelring). Jedes Zeichen hat seine eigene Bewegung: Rauch aus dem Kamin, wandernde
+        Strahlen, ein Läufer auf der Treppe, die Stehlampe am Sofa.</p>
       <p style="font-size:1.1vh; color:var(--muted); margin:0 0 1vh;">
         Bei <strong>Temperatur, Luftdruck, Feuchte und Sensor</strong> wird der Ort automatisch
-        geraten – aus Wörtern wie „außen“, „outdoor“, „Garten“, „Treppenhaus“, „Wohnzimmer“ oder „innen“ in
+        geraten – aus Wörtern wie „außen“, „outdoor“, „Garten“, „Treppenhaus“, „Wohnzimmer“, „Schlafzimmer“ oder „innen“ in
         Name und Entität. Bei <strong>Wind, Regen und Ringkarte</strong> nicht: Die gibt es nur
         draußen, ein selbsttätiges „AUSSEN“ wäre dort Rauschen. Eingestellt gilt es trotzdem –
         auf dem Bildschirmschoner ordnet die Silhouette die Fläche, man sieht aus fünf Metern,
@@ -1499,7 +1502,7 @@ $('settingsSave').addEventListener('click', () => {
     // Leer heisst "automatisch" und wird NICHT gespeichert: Nur so bekommt eine Karte, die nie
     // jemand angefasst hat, spaeter verbesserte Ratewoerter mit.
     const v = ($('setOrt') && $('setOrt').value) || '';
-    if (['innen', 'aussen', 'treppenhaus', 'kein'].includes(v)) settings.ort = v; else delete settings.ort;
+    if (['innen', 'aussen', 'treppenhaus', 'wohnzimmer', 'kein'].includes(v)) settings.ort = v; else delete settings.ort;
   }
   if (settingsFields.decimals) {
     const v = ($('setDecimals') && $('setDecimals').value.trim()) || '';

@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>Innen/Außen/Treppenhaus – Vorschau</title>
+<title>Orte – Vorschau</title>
 <!--
   Temperatur und Luftdruck, jeweils innen und aussen, so wie sie auf der Wand nebeneinander
   stehen. Ohne Home Assistant, ohne Electron, ohne Geraet.
@@ -52,13 +52,14 @@ const verlauf = (basis, schwankung) => Array.from({ length: 30 }, (_, i) =>
 const karten = [
   ['sensor.temp_1', 'temperature', Z('21.4', { friendly_name: 'Temperatur', unit_of_measurement: '°C' }), ort('innen'), { x: 0, y: 0, cols: 3, rows: 2 }, verlauf(21, 0.4)],
   ['sensor.temp_2', 'temperature', Z('8.2',  { friendly_name: 'Temperatur', unit_of_measurement: '°C' }), ort('aussen'), { x: 3, y: 0, cols: 3, rows: 2 }, verlauf(8, 2)],
-  // Der dritte Ort: eingestellt links, geraten rechts ("Treppenhaus" im Namen).
+  // Der dritte und vierte Ort: links eingestellt, in der Mitte geraten ("Wohnzimmer" im Namen
+  // -- das ist seit 1.0.30 ein eigener Raum, nicht mehr "innen"), rechts geraten ("Treppenhaus").
   ['sensor.temp_3', 'temperature', Z('17.9', { friendly_name: 'Temperatur', unit_of_measurement: '°C' }), ort('treppenhaus'), { x: 0, y: 2, cols: 2, rows: 2 }, verlauf(18, 0.6)],
   ['sensor.luftdruck_innen', 'pressure', Z('1013', { friendly_name: 'Luftdruck Wohnzimmer', unit_of_measurement: 'hPa' }), ort(), { x: 2, y: 2, cols: 2, rows: 2 }, verlauf(1013, 1)],
   ['sensor.feuchte_treppe', 'humidity', Z('52', { friendly_name: 'Feuchte Treppenhaus', unit_of_measurement: '%' }), ort(), { x: 4, y: 2, cols: 2, rows: 2 }, verlauf(52, 3)],
-  ['sensor.wind', 'wind', Z('14.6', { friendly_name: 'Wind', unit_of_measurement: 'km/h' }), ort('aussen'), { x: 0, y: 4, cols: 2, rows: 2 }, verlauf(14, 4)],
+  ['sensor.temp_4', 'temperature', Z('22.6', { friendly_name: 'Temperatur', unit_of_measurement: '°C' }), ort('wohnzimmer'), { x: 0, y: 4, cols: 2, rows: 2 }, verlauf(22.6, 0.3)],
   ['sensor.regen', 'rain', Z('0.4', { friendly_name: 'Regen', unit_of_measurement: 'mm/h' }), ort('aussen'), { x: 2, y: 4, cols: 2, rows: 2 }, verlauf(0.4, 0.2)],
-  ['sensor.uv', 'gauge', Z('3', { friendly_name: 'UV-Index', unit_of_measurement: '' }), { ...ort('aussen'), min: 0, max: 11 }, { x: 4, y: 4, cols: 2, rows: 2 }, verlauf(3, 1)]
+  ['sensor.wind', 'wind', Z('14.6', { friendly_name: 'Wind', unit_of_measurement: 'km/h' }), ort('aussen'), { x: 4, y: 4, cols: 2, rows: 2 }, verlauf(14, 4)]
 ];
 const raster = document.getElementById('raster');
 karten.forEach(([id, typ, zustand, settings, pos, history]) => {
