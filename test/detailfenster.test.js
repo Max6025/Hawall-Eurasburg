@@ -227,11 +227,19 @@ test('die Energiekarte ist in BEIDEN Lagen gleich', () => {
 
 // --- Der Abfallkalender --------------------------------------------------------------------
 
+// Die Termine liegen RELATIV zu heute: im naechsten und im uebernaechsten Monat. Fest
+// eingetragene Daten liefen am 2026-11-09 ab -- der Kalender beginnt beim laufenden Monat,
+// und Termine davor zeichnet er nicht, da schlugen zwei Tests ohne jede Aenderung am Code fehl.
+const inMonaten = (monate, tag) => {
+  const h = new Date();
+  const d = new Date(h.getFullYear(), h.getMonth() + monate, tag);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(tag).padStart(2, '0');
+};
 const ABFUHR = [
-  { start: '2026-10-07', summary: 'Restabfall' },
-  { start: '2026-10-07', summary: 'Papierabfall' },
-  { start: '2026-10-21', summary: 'Restabfall' },
-  { start: '2026-11-04', summary: 'Verpackungstonne' }
+  { start: inMonaten(1, 7), summary: 'Restabfall' },
+  { start: inMonaten(1, 7), summary: 'Papierabfall' },
+  { start: inMonaten(1, 21), summary: 'Restabfall' },
+  { start: inMonaten(2, 4), summary: 'Verpackungstonne' }
 ];
 
 test('ohne Debug zeigen die Muelltermine einen KALENDER', () => {
@@ -253,7 +261,7 @@ test('mit Debug zeigen sie die Rohdaten, keinen Kalender', () => {
 test('der Kalender deckt die Monate ab, in denen Termine liegen', () => {
   const h = de('calendar.awido', 'waste', null, { waste: ABFUHR });
   const monate = (h.match(/class="dk-monat"/g) || []).length;
-  assert.ok(monate >= 2, `zu wenige Monate (${monate}) -- die Termine reichen bis November`);
+  assert.ok(monate >= 2, `zu wenige Monate (${monate}) -- die Termine reichen bis in den uebernaechsten Monat`);
   assert.ok(monate <= 4, 'hoechstens vier -- der Abruf geht ueber 60 Tage, mehr waere leer');
 });
 
@@ -261,7 +269,7 @@ test('jeder Abfuhrtag traegt die Farben seiner Tonnen', () => {
   const h = de('calendar.awido', 'waste', null, { waste: ABFUHR });
   const abfuhrtage = (h.match(/class="dk-tag dk-abfuhr/g) || []).length;
   assert.strictEqual(abfuhrtage, 3, 'drei Tage mit Abfuhr, nicht vier Termine');
-  // Am 7.10. kommen zwei Tonnen -- also zwei Punkte an diesem Tag.
+  // Am 7. des naechsten Monats kommen zwei Tonnen -- also zwei Punkte an diesem Tag.
   assert.ok((h.match(/dk-punkt/g) || []).length >= 4, 'Punkte auf den Tagen und in der Legende');
 });
 
