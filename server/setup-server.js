@@ -991,10 +991,11 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     const list = store.get('dashboards') || [];
     const idx = list.findIndex(x => x.id === req.params.id);
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Dashboard nicht gefunden' });
-    const { name, layout, trackerEntity, trackerIconDataUrl, trackerDefaultZoom, trackerShowZones, trackerAutoCenter } = req.body || {};
+    const { name, layout, trackerEntity, trackerBatteryEntity, trackerIconDataUrl, trackerDefaultZoom, trackerShowZones, trackerAutoCenter } = req.body || {};
     if (name !== undefined) list[idx].name = name;
     if (layout !== undefined) list[idx].layout = layout;
     if (trackerEntity !== undefined) list[idx].trackerEntity = trackerEntity;
+    if (trackerBatteryEntity !== undefined) list[idx].trackerBatteryEntity = trackerBatteryEntity;
     if (trackerIconDataUrl !== undefined) list[idx].trackerIconDataUrl = trackerIconDataUrl;
     if (trackerDefaultZoom !== undefined) list[idx].trackerDefaultZoom = trackerDefaultZoom;
     if (trackerShowZones !== undefined) list[idx].trackerShowZones = trackerShowZones;

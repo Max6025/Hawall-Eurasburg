@@ -21,6 +21,7 @@ async function init() {
   const dash = dashRes.dashboard;
   $('pageTitle').textContent = `Tracker einrichten – ${dash.name}`;
   $('trackerEntity').value = dash.trackerEntity || '';
+  $('trackerBatteryEntity').value = dash.trackerBatteryEntity || '';
   $('defaultZoom').value = dash.trackerDefaultZoom || 16;
   $('autoCenter').checked = dash.trackerAutoCenter !== false;
   $('showZones').checked = !!dash.trackerShowZones;
@@ -29,6 +30,8 @@ async function init() {
 
   const trackers = (entRes.ok ? entRes.entities : []).filter(e => e.domain === 'device_tracker' || e.domain === 'person');
   $('trackerEntityList').innerHTML = trackers.map(e => `<option value="${e.entity_id}">${e.name}</option>`).join('');
+  const akkus = (entRes.ok ? entRes.entities : []).filter(e => e.domain === 'sensor' && e.klasse === 'battery');
+  $('trackerBatteryList').innerHTML = akkus.map(e => `<option value="${e.entity_id}">${e.name}</option>`).join('');
 
   $('iconUploadBtn').addEventListener('click', () => $('iconFileInput').click());
   $('iconFileInput').addEventListener('change', async () => {
@@ -54,6 +57,7 @@ async function init() {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         trackerEntity,
+        trackerBatteryEntity: $('trackerBatteryEntity').value.trim(),
         trackerIconDataUrl: iconDataUrl,
         trackerDefaultZoom: parseInt($('defaultZoom').value, 10) || 16,
         trackerAutoCenter: $('autoCenter').checked,

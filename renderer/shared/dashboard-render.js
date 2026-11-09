@@ -1542,6 +1542,74 @@
   // Sonneneinstrahlung gibt es nur draussen -- ein selbsttaetiges "AUSSEN" darauf waere Rauschen.
   const ORT_TYPEN = ['temperature', 'pressure', 'humidity', 'sensor'];
 
+  // --- Der Akku des Trackers ------------------------------------------------------------------
+  //
+  // Die Tracker-Ansicht zeigte den Akku nur, wenn die Standort-Entitaet selbst ein Attribut
+  // battery_level traegt. Das tun Handys. Ein GPS-Halsband (Tractive) liefert den Akku dagegen
+  // als EIGENE Entitaet daneben -- sensor.nesti_tracker_batterie, device_class battery -- und
+  // die Standort-Entitaet weiss nichts davon. Auf dem Panel stand deshalb: nichts.
+  //
+  // Reihenfolge: eine eingestellte Akku-Entitaet gewinnt; dann das Attribut der Entitaet;
+  // dann der Nachbar mit demselben Namensstamm (sensor.<stamm>_... mit device_class battery).
+  // Der Stamm ist der Teil nach dem Punkt: "nesti_tracker" findet "nesti_tracker_batterie",
+  // aber nicht "nesti_gewicht". Ob geladen wird, sagt der Nachbar mit device_class
+  // battery_charging, sonst das Attribut battery_charging.
+  //
+  // Reine Funktion: rein Kennung, Zustaende, Einstellung -- raus { prozent, laedt, quelle }
+  // oder null. Deshalb hier und nicht in dashboard.html, und deshalb pruefbar.
+
+  function trackerAkku(entityId, statesById, akkuEntitaet) {
+    const st = statesById || {};
+    const zahl = (v) => {
+      const n = parseFloat(v);
+      return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null;
+    };
+    const klasse = (id, soll) => !!(st[id] && st[id].attributes && st[id].attributes.device_class === soll);
+    const stamm = String(entityId || '').split('.')[1] || '';
+    const nachbar = (domain, soll) => stamm
+      ? Object.keys(st).find(id => id.startsWith(domain + '.' + stamm + '_') && klasse(id, soll))
+      : undefined;
+
+    let prozent = null, quelle = '';
+    if (akkuEntitaet && st[akkuEntitaet]) {
+      prozent = zahl(st[akkuEntitaet].state); quelle = akkuEntitaet;
+    }
+    const eigen = st[entityId];
+    const attr = (eigen && eigen.attributes) || {};
+    if (prozent === null) {
+      const p = zahl(attr.battery_level !== undefined ? attr.battery_level : attr.battery);
+      if (p !== null) { prozent = p; quelle = entityId; }
+    }
+    if (prozent === null) {
+      const id = nachbar('sensor', 'battery');
+      if (id) { prozent = zahl(st[id].state); quelle = id; }
+    }
+    if (prozent === null) return null;
+
+    let laedt = false;
+    const ladeId = nachbar('binary_sensor', 'battery_charging');
+    if (ladeId) laedt = st[ladeId].state === 'on';
+    else if (typeof attr.battery_charging === 'boolean') laedt = attr.battery_charging;
+    return { prozent, laedt, quelle };
+  }
+
+  /**
+   * Die Akku-Pille: ein Batteriesymbol, dessen Fuellung dem Stand entspricht, daneben die
+   * Zahl. Die Fuellung ist das, was man aus der Entfernung sieht -- die Zahl liest man, wenn
+   * man davorsteht. Beim Laden ein Blitz im Symbol.
+   */
+  function trackerAkkuHtml(akku) {
+    if (!akku) return '';
+    const breite = (13 * akku.prozent / 100).toFixed(1);
+    const blitz = akku.laedt
+      ? '<path d="M12.5 8.5l-3 4h2.2l-1 3 3-4h-2.2z" fill="var(--bg, #0b0b10)" stroke="none"/>' : '';
+    return `<span class="akku-symbol" aria-hidden="true"><svg viewBox="0 0 24 24">
+        <rect x="2" y="7" width="18" height="10" rx="2.2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M22 10.5v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <rect x="4.5" y="9.5" width="${breite}" height="5" rx="1" fill="currentColor"/>${blitz}
+      </svg></span><span class="akku-wert">${akku.prozent} %</span>`;
+  }
+
   // --- Der Inhalt des Detailfensters --------------------------------------------------------
   //
   // Reine Funktion: rein Kennung, Typ, Zustand und Zusatzdaten, raus HTML. Kein DOM, kein Netz
@@ -3678,7 +3746,7 @@
     defaultCardType, allowedCardTypes, defaultSize, buildCard,
     sizeToSpan, minSpanFor, clampSpan, resolveSpan, schonerSpanne, SCHONER_SPALTEN, SCHONER_ZEILEN, thresholdColor,
     domainsForType, typesForEntity, renderClockNow, sensorAkzente, SENSOR_FARBEN, SENSOR_FARBEN_HELL, isSolar,
-    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil, verlaufGlaetten,
+    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil, verlaufGlaetten, trackerAkku, trackerAkkuHtml,
     sensornameDeutsch, SENSORNAMEN,
     ORT_TYPEN_WAHL,
     DETAIL_TYPEN,

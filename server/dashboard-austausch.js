@@ -118,6 +118,7 @@ function exportieren(dashboard, kartenArten) {
 
   if (datei.art === 'tracker') {
     datei.tracker = { entitaet: d.trackerEntity || '' };
+    if (d.trackerBatteryEntity) datei.tracker.akku = d.trackerBatteryEntity;
     if (d.trackerIconDataUrl) {
       hinweise.push('Tracker: das eigene Symbolbild wird nicht mit übertragen');
     }
@@ -278,6 +279,8 @@ function importieren(roh, kartenArten) {
   };
   if (dashboard.type === 'tracker') {
     dashboard.trackerEntity = (roh.tracker && roh.tracker.entitaet) || roh.trackerEntity || '';
+    const akku = (roh.tracker && roh.tracker.akku) || roh.trackerBatteryEntity;
+    if (akku) dashboard.trackerBatteryEntity = String(akku);
   }
   return { ok: true, dashboard, fehler, warnungen };
 }

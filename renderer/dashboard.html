@@ -325,9 +325,12 @@ async function renderTrackerView(dashId) {
   if (!entityId) {
     battEl.textContent = 'Keine Tracker-Entität eingerichtet – siehe Unterdashboards im Setup.';
   } else if (st && st.attributes) {
-    const batt = st.attributes.battery_level ?? st.attributes.battery;
-    battEl.textContent = batt !== undefined ? `🔋 ${batt}%` : '';
-    battEl.classList.toggle('low', typeof batt === 'number' && batt <= 20);
+    // Der Akku kommt bei einem GPS-Halsband aus einer Nachbar-Entitaet, nicht aus der
+    // Standort-Entitaet -- siehe trackerAkku() in dashboard-render.js.
+    const akku = DashboardRender.trackerAkku(entityId, statesById, dash.trackerBatteryEntity);
+    battEl.innerHTML = DashboardRender.trackerAkkuHtml(akku);
+    battEl.classList.toggle('low', !!akku && akku.prozent <= 20);
+    battEl.classList.toggle('laedt', !!akku && akku.laedt);
     const lat = parseFloat(st.attributes.latitude), lon = parseFloat(st.attributes.longitude);
     if (!isNaN(lat) && !isNaN(lon)) {
       const markerIcon = dash.trackerIconDataUrl

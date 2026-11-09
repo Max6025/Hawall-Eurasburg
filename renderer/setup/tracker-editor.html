@@ -25,11 +25,18 @@
       <h1 id="pageTitle">Tracker einrichten</h1>
       <p class="note" style="margin-top:0;">
         Dieses Unterdashboard zeigt auf dem Wall Display eine Karte mit dem aktuellen Standort
-        und dem Verlauf der gewählten Entität, plus Akkustand (sofern die Entität einen liefert).
+        und dem Verlauf der gewählten Entität, plus Akkustand.
       </p>
       <label>Tracker-Entität</label>
       <input type="text" id="trackerEntity" list="trackerEntityList" placeholder="device_tracker.katze">
       <datalist id="trackerEntityList"></datalist>
+
+      <label>Akku-Entität (optional)</label>
+      <input type="text" id="trackerBatteryEntity" list="trackerBatteryList" placeholder="sensor.katze_tracker_batterie">
+      <datalist id="trackerBatteryList"></datalist>
+      <p class="hint-text">Leer = automatisch: erst das Batterie-Attribut der Tracker-Entität
+        (Handys), sonst der Batterie-Sensor mit demselben Namensstamm (GPS-Halsbänder liefern
+        den Akku als eigene Entität). Hier eintragen, wenn das nicht trifft.</p>
 
       <label>Eigenes Symbol für den Marker (optional)</label>
       <div style="display:flex; align-items:center; gap:0.8rem;">

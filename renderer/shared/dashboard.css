@@ -1007,8 +1007,21 @@ body.light-theme .card .ort-silhouette { opacity: 0.09; }
 /* Tracker-Unterdashboard: Standort + Verlauf auf einer OpenStreetMap-Karte */
 .tracker-view { flex: 1; display: flex; flex-direction: column; padding: 0 2vw 1vh; gap: 1vh; min-height: 0; }
 .tracker-toolbar { display: flex; align-items: center; gap: 1.2vh; flex-wrap: wrap; }
-.tracker-battery { font-size: 1.4vh; color: var(--muted); font-weight: 600; min-width: 6vh; }
-.tracker-battery.low { color: #ff8a8a; }
+/* Der Akku des Trackers: Gemeldet wurde "die Batterie soll dort, wo man sie sehen kann".
+   Vorher war sie ein grauer Text in 1,4vh -- auf dem Panel keine drei Millimeter, und bei
+   einem Halsband-Tracker ohnehin leer (siehe trackerAkku). Jetzt eine Pille in der Hoehe der
+   Zeitraum-Knoepfe, mit einem Batteriesymbol, dessen Fuellung man aus der Entfernung sieht. */
+.tracker-battery {
+  display: inline-flex; align-items: center; gap: 1vh;
+  min-height: 5.2vh; padding: 0 2vh 0 1.4vh; border-radius: 999px;
+  background: var(--panel2); border: 1px solid var(--card-border);
+  color: var(--text); font-size: 2.2vh; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.tracker-battery:empty { display: none; }
+.tracker-battery .akku-symbol { width: 3.6vh; height: 3.6vh; display: inline-block; }
+.tracker-battery .akku-symbol svg { width: 100%; height: 100%; display: block; }
+.tracker-battery.low { color: #ff8a8a; border-color: rgba(255, 138, 138, 0.55); }
+.tracker-battery.laedt .akku-symbol { color: #57c98a; }
 /* Die Zeitraum-Knoepfe waren mit 1,2vh Schrift und 0,6vh Polsterung auf dem Panel keine
    drei Millimeter hoch -- mit dem Finger trifft man das nicht, und danebengetippt heisst hier
    "anderer Zeitraum geladen". Jetzt haben sie eine Mindesthoehe, die einer Fingerkuppe

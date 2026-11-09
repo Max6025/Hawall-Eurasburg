@@ -36,7 +36,7 @@
       <div class="grid" id="grid" style="display:none;"></div>
       <div class="tracker-view" id="trackerView" style="display:flex;">
         <div class="tracker-toolbar">
-          <div class="tracker-battery">🔋 82%</div>
+          <div class="tracker-battery" id="akku"></div>
           <div class="tracker-range-btns" id="btns">
             <button data-range="6h">6 Std</button>
             <button data-range="24h" class="active">24 Std</button>
@@ -89,4 +89,15 @@
     + `Schrift ${getComputedStyle(knopf).fontSize} · Streifen ${Math.round(leiste.height)} px `
     + `(oben bei y=${Math.round(leiste.top)}), Karte ${Math.round(karte.height)} px `
     + `(oben bei y=${Math.round(karte.top)})`;
+</script>
+
+<script src="../../renderer/shared/dashboard-render.js"></script>
+<script>
+  // Die Akku-Pille mit der echten Zeichnung: ?leer fuer 12 % (rot), ?laedt fuer den Blitz.
+  const Q = new URLSearchParams(location.search);
+  const akku = { prozent: Q.has('leer') ? 12 : 82, laedt: Q.has('laedt'), quelle: 'probe' };
+  const el = document.getElementById('akku');
+  el.innerHTML = DashboardRender.trackerAkkuHtml(akku);
+  el.classList.toggle('low', akku.prozent <= 20);
+  el.classList.toggle('laedt', akku.laedt);
 </script>
