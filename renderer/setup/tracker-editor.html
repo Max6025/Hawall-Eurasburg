@@ -38,6 +38,28 @@
         (Handys), sonst der Batterie-Sensor mit demselben Namensstamm (GPS-Halsbänder liefern
         den Akku als eigene Entität). Hier eintragen, wenn das nicht trifft.</p>
 
+      <h2 style="font-size:1.05rem; margin:1.6rem 0 0.4rem;">Verlauf direkt von Tractive (optional)</h2>
+      <p class="hint-text" style="margin-bottom:0.6rem;">Home Assistant bekommt vom Halsband nur, was
+        gerade gemeldet wird, und holt nichts nach – was während eines HA-Neustarts oder im
+        Live-Modus anfiel, fehlt dort. Mit dem Tractive-Login holt das Panel den Verlauf direkt
+        vom Tractive-Server, wie die App. Der Login bleibt auf dem Gerät.</p>
+      <div id="tractiveAus">
+        <label>Tractive E-Mail</label>
+        <input type="email" id="tractiveEmail" autocomplete="off" placeholder="name@beispiel.de">
+        <label>Tractive Passwort</label>
+        <input type="password" id="tractivePasswort" autocomplete="new-password">
+        <button type="button" id="tractiveLoginBtn" style="margin-top:0.4rem;">Anmelden und Tracker suchen</button>
+      </div>
+      <div id="tractiveAn" style="display:none;">
+        <p class="hint-text">Angemeldet als <strong id="tractiveWer"></strong>.
+          <button type="button" id="tractiveLogoutBtn" style="margin:0 0 0 0.6rem; background:#6c757d; padding:0.3rem 0.7rem; font-size:0.85rem;">Abmelden</button></p>
+        <label>Tracker</label>
+        <select id="trackerTractiveId"><option value="">– Verlauf aus Home Assistant –</option></select>
+        <p class="hint-text">Mit gewähltem Tracker kommt der Verlauf von Tractive; klappt das einmal
+          nicht, nimmt die Karte still den Verlauf aus Home Assistant.</p>
+      </div>
+      <div id="tractiveResult" class="result"></div>
+
       <label>Eigenes Symbol für den Marker (optional)</label>
       <div style="display:flex; align-items:center; gap:0.8rem;">
         <img id="iconPreview" style="display:none; width:2.4rem; height:2.4rem; border-radius:50%; object-fit:cover; background:var(--bg);">

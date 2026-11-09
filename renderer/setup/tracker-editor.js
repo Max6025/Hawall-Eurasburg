@@ -22,6 +22,7 @@ async function init() {
   $('pageTitle').textContent = `Tracker einrichten – ${dash.name}`;
   $('trackerEntity').value = dash.trackerEntity || '';
   $('trackerBatteryEntity').value = dash.trackerBatteryEntity || '';
+  await tractiveEinrichten(dash.trackerTractiveId || '');
   $('defaultZoom').value = dash.trackerDefaultZoom || 16;
   $('autoCenter').checked = dash.trackerAutoCenter !== false;
   $('showZones').checked = !!dash.trackerShowZones;
@@ -58,6 +59,7 @@ async function init() {
       body: JSON.stringify({
         trackerEntity,
         trackerBatteryEntity: $('trackerBatteryEntity').value.trim(),
+        trackerTractiveId: $('trackerTractiveId').value,
         trackerIconDataUrl: iconDataUrl,
         trackerDefaultZoom: parseInt($('defaultZoom').value, 10) || 16,
         trackerAutoCenter: $('autoCenter').checked,
@@ -174,4 +176,60 @@ function resizeImageFile(file, maxDim) {
     };
     reader.readAsDataURL(file);
   });
+}
+
+// --- Tractive -----------------------------------------------------------------------------------
+//
+// Der Login wird NUR nach erfolgreicher Anmeldung gespeichert (macht der Server), und die
+// Trackerliste kommt aus derselben Antwort -- wer sich anmeldet, sieht sofort, ob der eigene
+// Tracker dabei ist. Die gespeicherte Tracker-Kennung des Dashboards bleibt in der Auswahl
+// auch dann stehen, wenn die Liste gerade nicht zu holen ist.
+async function tractiveEinrichten(gewaehlt) {
+  const auswahl = $('trackerTractiveId');
+  const listeFuellen = (tracker) => {
+    const vorhanden = new Set((tracker || []).map(t => t.id));
+    let html = '<option value="">– Verlauf aus Home Assistant –</option>';
+    for (const t of (tracker || [])) html += `<option value="${t.id}">${t.name ? t.name + ' (' + t.id + ')' : t.id}</option>`;
+    if (gewaehlt && !vorhanden.has(gewaehlt)) html += `<option value="${gewaehlt}">${gewaehlt}</option>`;
+    auswahl.innerHTML = html;
+    auswahl.value = gewaehlt || '';
+  };
+  const zeigen = async (status) => {
+    const an = !!(status && status.eingerichtet);
+    $('tractiveAus').style.display = an ? 'none' : '';
+    $('tractiveAn').style.display = an ? '' : 'none';
+    if (an) {
+      $('tractiveWer').textContent = status.email || '';
+      const r = await fetch('/api/tractive/trackers').then(x => x.json()).catch(() => ({ ok: false }));
+      listeFuellen(r.ok ? r.tracker : []);
+      if (!r.ok) meldung('Tracker gerade nicht abrufbar: ' + (r.error || 'unbekannt'), false);
+    } else {
+      listeFuellen([]);
+    }
+  };
+  const meldung = (text, gut) => { $('tractiveResult').textContent = text; $('tractiveResult').className = 'result ' + (gut ? 'ok' : 'err'); };
+
+  $('tractiveLoginBtn').addEventListener('click', async () => {
+    const email = $('tractiveEmail').value.trim(), passwort = $('tractivePasswort').value;
+    if (!email || !passwort) return meldung('E-Mail und Passwort eintragen.', false);
+    $('tractiveLoginBtn').disabled = true;
+    const r = await fetch('/api/tractive/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, passwort })
+    }).then(x => x.json()).catch(e => ({ ok: false, error: String(e) }));
+    $('tractiveLoginBtn').disabled = false;
+    if (!r.ok) return meldung('Anmeldung fehlgeschlagen: ' + (r.error || 'unbekannt'), false);
+    $('tractivePasswort').value = '';
+    meldung(`Angemeldet. ${r.tracker.length} Tracker gefunden – unten auswählen und speichern.`, true);
+    await zeigen({ eingerichtet: true, email });
+    if (r.tracker.length === 1) auswahl.value = r.tracker[0].id;
+  });
+  $('tractiveLogoutBtn').addEventListener('click', async () => {
+    await fetch('/api/tractive/logout', { method: 'POST' });
+    gewaehlt = '';
+    meldung('Abgemeldet – der Verlauf kommt wieder aus Home Assistant. Noch speichern.', true);
+    await zeigen({ eingerichtet: false });
+  });
+
+  const status = await fetch('/api/tractive/status').then(x => x.json()).catch(() => ({ ok: false }));
+  await zeigen(status);
 }

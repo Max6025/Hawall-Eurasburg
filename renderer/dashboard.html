@@ -283,6 +283,8 @@ let trackerActiveRangeBtn = null;
 // keinen aktiven Zeitraum mehr, und damit waeren beim naechsten Aufruf alle Knoepfe ein
 // zweites Mal verdrahtet worden: ein Tippen, zwei Abrufe.
 let trackerVerdrahtet = false;
+// Die Tractive-Kennung des Trackers auf dem aktuellen Tracker-Dashboard, leer = HA-Verlauf.
+let trackerTractiveId = '';
 let trackerZoneLayers = [];
 
 function ensureTrackerMap() {
@@ -300,6 +302,7 @@ async function renderTrackerView(dashId) {
   if (!data.ok) return;
   const dash = data.dashboard;
   const entityId = dash.trackerEntity;
+  trackerTractiveId = dash.trackerTractiveId || '';
   const map = ensureTrackerMap();
   setTimeout(() => map.invalidateSize(), 50); // Container war ggf. unsichtbar (Groesse 0) beim Erzeugen
 
@@ -396,8 +399,20 @@ async function loadTrackerHistory(entityId, range, btnEl, customStart, customEnd
     trackerActiveRangeBtn = btnEl;
   }
   const { start, end } = customStart ? { start: customStart, end: customEnd } : rangeToStartEnd(range);
-  const r = await fetch(`${API}/api/ha/tracker-history?entity_id=${encodeURIComponent(entityId)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
-  const data = await r.json();
+  // Mit Tractive-Kennung kommt der Verlauf direkt vom Tractive-Server -- dort liegt auch,
+  // was Home Assistant verpasst hat. Klappt das nicht (Login abgelaufen, Schnittstelle
+  // geaendert), faellt die Karte still auf den HA-Verlauf zurueck: lieber die Punkte von
+  // gestern als gar keine.
+  const haAbruf = () => fetch(`${API}/api/ha/tracker-history?entity_id=${encodeURIComponent(entityId)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`).then(r => r.json());
+  let data;
+  if (trackerTractiveId) {
+    try {
+      data = await fetch(`${API}/api/tractive/positions?tracker=${encodeURIComponent(trackerTractiveId)}&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`).then(r => r.json());
+    } catch (e) { data = null; }
+    if (!data || !data.ok) { console.warn('Tractive-Verlauf nicht verfuegbar, nehme Home Assistant:', data && data.error); data = await haAbruf(); }
+  } else {
+    data = await haAbruf();
+  }
   const map = ensureTrackerMap();
   if (trackerPolyline) { map.removeLayer(trackerPolyline); trackerPolyline = null; }
   if (!data.ok || !data.points || !data.points.length) {

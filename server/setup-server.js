@@ -11,6 +11,7 @@ const { HaLive } = require('./ha-live');
 const { TorBeobachter } = require('../control/torzeiten');
 const { SCHWELLE_MINDESTENS } = require('../renderer/shared/akku.js');
 const systemstatus = require('./systemstatus');
+const { erzeugeTractive } = require('./tractive');
 
 // Die Adresse der Gesundheitspruefung steht an EINER Stelle: Sie wird von der
 // Von der Route selbst und von einem Test gebraucht, und zwei Zeichenketten laufen beim
@@ -973,6 +974,68 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     res.json({ ok: true, dashboard: d });
   });
 
+  // --- Tractive: der Verlauf direkt vom Hersteller --------------------------------------------
+  //
+  // Home Assistant fuellt nichts nach, was es verpasst hat; der Tractive-Server hat alles.
+  // Der Login liegt nur hier auf dem Geraet (wie das HA-Token) und geht nie heraus --
+  // /api/tractive/status sagt nur, OB einer da ist. Siehe server/tractive.js.
+  const tractive = erzeugeTractive();
+  const tractiveLogin = () => ({ email: store.get('tractiveEmail') || '', passwort: store.get('tractivePasswort') || '' });
+
+  app.get('/api/tractive/status', (req, res) => {
+    const l = tractiveLogin();
+    res.json({ ok: true, eingerichtet: !!(l.email && l.passwort), email: l.email });
+  });
+
+  // Anmelden, Tracker holen, und erst bei Erfolg speichern -- ein falsches Passwort soll
+  // nicht gespeichert werden.
+  app.post('/api/tractive/login', async (req, res) => {
+    const { email, passwort } = req.body || {};
+    if (!email || !passwort) return res.status(400).json({ ok: false, error: 'E-Mail und Passwort erforderlich' });
+    try {
+      await tractive.anmelden(String(email), String(passwort));
+      const liste = await tractive.tracker();
+      store.set('tractiveEmail', String(email));
+      store.set('tractivePasswort', String(passwort));
+      res.json({ ok: true, tracker: liste });
+    } catch (err) {
+      res.json({ ok: false, error: String(err.message || err) });
+    }
+  });
+
+  app.post('/api/tractive/logout', (req, res) => {
+    store.delete('tractiveEmail'); store.delete('tractivePasswort');
+    tractive.abmelden();
+    res.json({ ok: true });
+  });
+
+  app.get('/api/tractive/trackers', async (req, res) => {
+    const l = tractiveLogin();
+    if (!l.email || !l.passwort) return res.json({ ok: false, error: 'Kein Tractive-Login eingerichtet' });
+    try {
+      await tractive.sicherstellen(l.email, l.passwort);
+      res.json({ ok: true, tracker: await tractive.tracker() });
+    } catch (err) {
+      res.json({ ok: false, error: String(err.message || err) });
+    }
+  });
+
+  // Dieselbe Form wie /api/ha/tracker-history: { ok, points: [{ lat, lon, t }] }, damit die
+  // Karte beide Quellen gleich behandelt.
+  app.get('/api/tractive/positions', async (req, res) => {
+    const { tracker: trackerId, start, end } = req.query;
+    const l = tractiveLogin();
+    if (!l.email || !l.passwort) return res.json({ ok: false, error: 'Kein Tractive-Login eingerichtet' });
+    if (!trackerId || !start || !end) return res.status(400).json({ ok: false, error: 'tracker, start und end erforderlich' });
+    try {
+      await tractive.sicherstellen(l.email, l.passwort);
+      const punkte = await tractive.verlauf(String(trackerId), start, end);
+      res.json({ ok: true, points: punkte });
+    } catch (err) {
+      res.json({ ok: false, error: String(err.message || err) });
+    }
+  });
+
   // Neues Dashboard anlegen -- type "cards" (Standard, wie bisher) oder "tracker"
   // (Kartenansicht mit Standort+Verlauf eines device_tracker, z.B. fuer ein GPS-Halsband).
   app.post('/api/dashboards', (req, res) => {
@@ -991,11 +1054,12 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     const list = store.get('dashboards') || [];
     const idx = list.findIndex(x => x.id === req.params.id);
     if (idx === -1) return res.status(404).json({ ok: false, error: 'Dashboard nicht gefunden' });
-    const { name, layout, trackerEntity, trackerBatteryEntity, trackerIconDataUrl, trackerDefaultZoom, trackerShowZones, trackerAutoCenter } = req.body || {};
+    const { name, layout, trackerEntity, trackerBatteryEntity, trackerTractiveId, trackerIconDataUrl, trackerDefaultZoom, trackerShowZones, trackerAutoCenter } = req.body || {};
     if (name !== undefined) list[idx].name = name;
     if (layout !== undefined) list[idx].layout = layout;
     if (trackerEntity !== undefined) list[idx].trackerEntity = trackerEntity;
     if (trackerBatteryEntity !== undefined) list[idx].trackerBatteryEntity = trackerBatteryEntity;
+    if (trackerTractiveId !== undefined) list[idx].trackerTractiveId = trackerTractiveId;
     if (trackerIconDataUrl !== undefined) list[idx].trackerIconDataUrl = trackerIconDataUrl;
     if (trackerDefaultZoom !== undefined) list[idx].trackerDefaultZoom = trackerDefaultZoom;
     if (trackerShowZones !== undefined) list[idx].trackerShowZones = trackerShowZones;
