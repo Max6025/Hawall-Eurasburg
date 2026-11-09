@@ -1024,19 +1024,40 @@
   // Also derselbe Verlauf, den die Verlaufskarte ohnehin abruft, aber als ruhige Flaeche im
   // unteren Drittel hinter dem Text -- kein zweites Diagramm, sondern Untergrund.
 
+  /**
+   * Gleitender Mittelwert mit den Gewichten 1-2-1, mehrmals hintereinander. Die Raender
+   * behalten ihren Wert -- sonst zoege die Kurve am Anfang und Ende zur Mitte.
+   *
+   * Der Anlass: Auf dem Panel sah der Verlauf hinter Luftfeuchte und Luftdruck aus wie ein
+   * Saegeblatt. Die Werte sind zeitlich schon gemittelt (downsample), aber ein Fuehler, der
+   * zwischen 50 und 51 Prozent hin- und herspringt, liefert trotzdem eine Zickzacklinie --
+   * und die Flaeche hinter der Zahl soll ein RUHIGER Untergrund sein, kein Diagramm. Wer die
+   * Spitzen sehen will, tippt auf die Karte und bekommt das Detailfenster mit den Rohdaten.
+   */
+  function verlaufGlaetten(werte, durchgaenge) {
+    let w = werte.slice();
+    for (let d = 0; d < (durchgaenge === undefined ? 2 : durchgaenge); d++) {
+      w = w.map((v, i, a) => (i === 0 || i === a.length - 1) ? v : (a[i - 1] + 2 * v + a[i + 1]) / 4);
+    }
+    return w;
+  }
+
   /** Gefuellte Flaeche ohne Achsen und Beschriftung. Leer, wenn zu wenige Punkte da sind. */
   function miniVerlaufSvg(werte, id) {
     if (!werte || werte.length < 3 || werte.some(v => !Number.isFinite(v))) return '';
-    const min = Math.min(...werte);
-    const max = Math.max(...werte);
+    const glatt = verlaufGlaetten(werte);
+    const min = Math.min(...glatt);
+    const max = Math.max(...glatt);
     const spanne = (max - min) || 1;
     const B = 100, H = 30;
-    const punkte = werte.map((v, i) => {
-      const x = (i / (werte.length - 1)) * B;
-      const y = H - ((v - min) / spanne) * H;
-      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    // Etwas Luft nach oben: Die Kurve soll nicht an der Kante der Flaeche kleben.
+    const punkte = glatt.map((v, i) => {
+      const x = (i / (glatt.length - 1)) * B;
+      const y = H - ((v - min) / spanne) * H * 0.9;
+      return [x, y];
     });
-    const linie = 'M' + punkte.join(' L');
+    // Dieselbe weiche Kurve wie auf der Verlaufskarte (smoothPath), nicht Gerade an Gerade.
+    const linie = smoothPath(punkte);
     const flaeche = `${linie} L${B},${H} L0,${H} Z`;
     return `<svg class="mini-verlauf" viewBox="0 0 ${B} ${H}" preserveAspectRatio="none" aria-hidden="true">
       <defs><linearGradient id="mv-${id}" x1="0" y1="0" x2="0" y2="1">
@@ -3657,7 +3678,7 @@
     defaultCardType, allowedCardTypes, defaultSize, buildCard,
     sizeToSpan, minSpanFor, clampSpan, resolveSpan, schonerSpanne, SCHONER_SPALTEN, SCHONER_ZEILEN, thresholdColor,
     domainsForType, typesForEntity, renderClockNow, sensorAkzente, SENSOR_FARBEN, SENSOR_FARBEN_HELL, isSolar,
-    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil,
+    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil, verlaufGlaetten,
     sensornameDeutsch, SENSORNAMEN,
     ORT_TYPEN_WAHL,
     DETAIL_TYPEN,

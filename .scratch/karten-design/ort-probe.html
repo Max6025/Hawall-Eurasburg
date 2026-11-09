@@ -43,8 +43,12 @@ const Z = (state, attributes = {}) => ({ state, attributes });
 // Absichtlich KEINE Ortswoerter in den Namen der ersten beiden: So sieht man, dass die
 // Einstellung wirkt und nicht nur das Raten. Die anderen beiden werden geraten.
 const ort = (w) => P.has('ohne') ? { ort: 'kein' } : (w ? { ort: w } : {});
-const verlauf = (basis, schwankung) => Array.from({ length: 30 }, (_, i) =>
-  ({ t: Date.now() - (30 - i) * 600000, v: basis + Math.sin(i / 4) * schwankung }));
+// Mit Rauschen wie beim echten Fuehler: Ohne das sah der Verlauf in der Probe glatt aus und
+// auf dem Panel wie ein Saegeblatt.
+let saat = 7;
+const zufall = () => { saat = (saat * 9301 + 49297) % 233280; return saat / 233280 - 0.5; };
+const verlauf = (basis, schwankung) => Array.from({ length: 120 }, (_, i) =>
+  ({ t: Date.now() - (120 - i) * 150000, v: basis + Math.sin(i / 16) * schwankung + zufall() * schwankung * 0.9 }));
 
 // Zwei Reihen. OBEN die vier, die den Ort schon immer kannten -- unten Wind, Regen und
 // Ringkarte, die ihn erst bekommen, wenn man ihn einstellt. Genau die sind der neue Fall, und

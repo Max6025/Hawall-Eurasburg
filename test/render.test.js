@@ -361,6 +361,25 @@ test('Aus genug Punkten entsteht eine Flaeche', () => {
   assert.ok(svg.includes('mv-test'), 'Verlaufskennung fehlt');
 });
 
+test('Der Hintergrundverlauf ist eine weiche Kurve, keine Zickzacklinie', () => {
+  // Gemeldet vom Panel: Hinter Luftfeuchte und Luftdruck sah der Verlauf aus wie ein
+  // Saegeblatt. Ein Fuehler, der zwischen zwei Werten springt, soll als ruhige Flaeche
+  // erscheinen -- die Spitzen gehoeren ins Detailfenster, nicht in den Untergrund.
+  const zickzack = [50, 51, 50, 51, 50, 51, 50, 51, 50, 51];
+  const glatt = D.verlaufGlaetten(zickzack);
+  const ausschlag = a => Math.max(...a.slice(1, -1)) - Math.min(...a.slice(1, -1));
+  assert.ok(ausschlag(glatt) < ausschlag(zickzack) * 0.5, 'die Glaettung nimmt dem Zickzack nicht genug');
+  // Die Raender bleiben, wo sie sind -- sonst zoege die Kurve am Anfang zur Mitte.
+  assert.strictEqual(glatt[0], 50); assert.strictEqual(glatt[glatt.length - 1], 51);
+  // Und gezeichnet wird mit Kurvenstuecken (Q), nicht Gerade an Gerade (L).
+  const svg = D.miniVerlaufSvg(zickzack, 'zz');
+  assert.ok(/ Q /.test(svg), 'keine Kurvenstuecke im Pfad');
+  // Geraden gibt es nur noch zum Abschluss: der letzte Punkt und die zwei Ecken der Flaeche,
+  // in beiden Pfaden (Flaeche und Linie) zusammen also hoechstens vier.
+  assert.ok((svg.match(/ Q /g) || []).length >= 5, 'zu wenige Kurvenstuecke');
+  assert.ok((svg.match(/ L/g) || []).length <= 4, 'der Pfad besteht noch aus Geraden');
+});
+
 test('Zu wenige Punkte zeichnen lieber nichts', () => {
   // Eine Karte ohne Verlaufsdaten soll aussehen wie vorher, nicht wie eine kaputte Flaeche.
   assert.strictEqual(D.miniVerlaufSvg([1, 2], 'x'), '');
