@@ -1610,6 +1610,72 @@
       </svg></span><span class="akku-wert">${akku.prozent} %</span>`;
   }
 
+  // --- Die Spur des Trackers ------------------------------------------------------------------
+  //
+  // Auf dem Panel sah die Sieben-Tage-Spur aus wie ein Stern: Dutzende Linien, die alle in
+  // einem Punkt zusammenlaufen. In den Daten steht der Grund: Zwischen zwei Positionen im
+  // Freien steht immer wieder -- oft nur fuer fuenf Sekunden -- die EXAKT gleiche Koordinate,
+  // drei Meter neben der Zone "zu Hause". Das ist die Ladestation: Sobald das Halsband sie
+  // kurz sieht, meldet Tractive deren Position statt der GPS-Position. Eine Linie dorthin und
+  // zurueck ist kein Weg, den die Katze gegangen ist.
+  //
+  // Deshalb:
+  //   1. Ankerpunkte fliegen aus der Spur. Anker ist, was sich EXAKT wiederholt (GPS im Freien
+  //      wiederholt sich nie auf sechs Nachkommastellen) oder wenige Meter neben einer Zone
+  //      liegt. Die Zone selbst steht als Kreis auf der Karte, das reicht.
+  //   2. Die Spur reisst bei Pausen ab. Zwei Positionen mit einer Stunde dazwischen -- weil
+  //      die Katze so lange an der Station lag -- gehoeren zu zwei Ausfluegen; eine Gerade
+  //      quer durch den Ort dazwischen waere erfunden.
+  //   3. Jede echte Position wird als Punkt gezeichnet, nicht nur die Linie. Gemeldet wurde
+  //      "Tractive zeigt gefuehlt mehr Punkte" -- die Punkte waren da, nur unsichtbar.
+  //
+  // Reine Funktion, mit den echten Daten vom Panel gegengerechnet (test/trackerspur.test.js).
+
+  function trackerSpur(points, zonen, opts) {
+    const o = Object.assign({ pauseMinuten: 45, ankerWiederholungen: 3, zoneMeter: 8 }, opts || {});
+    const roh = (Array.isArray(points) ? points : [])
+      .map(p => ({ lat: Number(p.lat), lon: Number(p.lon), t: p.t }))
+      .filter(p => Number.isFinite(p.lat) && Number.isFinite(p.lon));
+    // Aufeinanderfolgende Wiederholungen derselben Position: eine Position, kein Weg.
+    const folge = roh.filter((p, i) => i === 0 || p.lat !== roh[i - 1].lat || p.lon !== roh[i - 1].lon);
+
+    const schluessel = (p) => p.lat + ',' + p.lon;
+    const haeufigkeit = new Map();
+    for (const p of folge) haeufigkeit.set(schluessel(p), (haeufigkeit.get(schluessel(p)) || 0) + 1);
+    const meter = (a, b) => {
+      const dLat = (a.lat - b.lat) * 111320;
+      const dLon = (a.lon - b.lon) * 111320 * Math.cos((a.lat * Math.PI) / 180);
+      return Math.sqrt(dLat * dLat + dLon * dLon);
+    };
+    const zonenListe = (Array.isArray(zonen) ? zonen : [])
+      .map(z => ({ lat: Number(z.lat), lon: Number(z.lon) }))
+      .filter(z => Number.isFinite(z.lat) && Number.isFinite(z.lon));
+    const istAnker = (p) => haeufigkeit.get(schluessel(p)) >= o.ankerWiederholungen
+      || zonenListe.some(z => meter(p, z) <= o.zoneMeter);
+
+    const anker = [];
+    const punkte = [];
+    for (const p of folge) {
+      if (istAnker(p)) {
+        if (!anker.some(a => a.lat === p.lat && a.lon === p.lon)) anker.push({ lat: p.lat, lon: p.lon, anzahl: haeufigkeit.get(schluessel(p)) });
+      } else {
+        punkte.push(p);
+      }
+    }
+
+    const ms = (t) => { const d = new Date(t); return isNaN(d.getTime()) ? null : d.getTime(); };
+    const segmente = [];
+    let aktuell = null, zuletzt = null;
+    for (const p of punkte) {
+      const jetzt = ms(p.t);
+      const pause = aktuell && zuletzt !== null && jetzt !== null && (jetzt - zuletzt) > o.pauseMinuten * 60000;
+      if (!aktuell || pause) { aktuell = []; segmente.push(aktuell); }
+      aktuell.push([p.lat, p.lon]);
+      if (jetzt !== null) zuletzt = jetzt;
+    }
+    return { segmente, punkte, anker };
+  }
+
   // --- Der Inhalt des Detailfensters --------------------------------------------------------
   //
   // Reine Funktion: rein Kennung, Typ, Zustand und Zusatzdaten, raus HTML. Kein DOM, kein Netz
@@ -3746,7 +3812,7 @@
     defaultCardType, allowedCardTypes, defaultSize, buildCard,
     sizeToSpan, minSpanFor, clampSpan, resolveSpan, schonerSpanne, SCHONER_SPALTEN, SCHONER_ZEILEN, thresholdColor,
     domainsForType, typesForEntity, renderClockNow, sensorAkzente, SENSOR_FARBEN, SENSOR_FARBEN_HELL, isSolar,
-    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil, verlaufGlaetten, trackerAkku, trackerAkkuHtml,
+    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil, verlaufGlaetten, trackerAkku, trackerAkkuHtml, trackerSpur,
     sensornameDeutsch, SENSORNAMEN,
     ORT_TYPEN_WAHL,
     DETAIL_TYPEN,

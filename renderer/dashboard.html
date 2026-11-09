@@ -404,9 +404,19 @@ async function loadTrackerHistory(entityId, range, btnEl, customStart, customEnd
     verlaufKnopfAnpassen();
     return;
   }
-  const latlngs = data.points.map(p => [p.lat, p.lon]);
-  trackerPolyline = L.polyline(latlngs, { color: '#4f7cff', weight: 3 }).addTo(map);
-  map.fitBounds(trackerPolyline.getBounds(), { padding: [30, 30] });
+  // Keine Linie zur Ladestation und zurueck, keine Gerade ueber eine Pause hinweg, und jede
+  // echte Position als Punkt -- siehe trackerSpur() in dashboard-render.js.
+  const zonen = Object.keys(statesById).filter(id => id.startsWith('zone.'))
+    .map(id => ({ lat: statesById[id].attributes.latitude, lon: statesById[id].attributes.longitude }));
+  const spur = DashboardRender.trackerSpur(data.points, zonen);
+  const gruppe = L.featureGroup();
+  spur.segmente.filter(s => s.length > 1).forEach(s =>
+    L.polyline(s, { color: '#4f7cff', weight: 3, opacity: 0.85 }).addTo(gruppe));
+  spur.punkte.forEach(p =>
+    L.circleMarker([p.lat, p.lon], { radius: 4, color: '#fff', weight: 1.5, fillColor: '#4f7cff', fillOpacity: 1 }).addTo(gruppe));
+  // trackerPolyline bleibt der Name: "liegt eine Spur?" fragen mehrere Stellen daran ab.
+  trackerPolyline = gruppe.addTo(map);
+  if (spur.punkte.length) map.fitBounds(gruppe.getBounds(), { padding: [30, 30] });
   verlaufKnopfAnpassen();
 }
 
