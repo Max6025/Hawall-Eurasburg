@@ -1379,8 +1379,8 @@
   // (°C, hPa, %) unterscheidet die Messgroesse; der Ort bekommt ein eigenes Zeichen, das man an
   // der FORM erkennt, nicht an der Schrift:
   //
-  //   - ein grosses Wort im Chip oben rechts ("INNEN" / "AUSSEN"),
-  //   - das Symbol oben links wird zum Haus bzw. zur Sonne,
+  //   - ein grosses Wort im Chip oben rechts ("INNEN" / "AUSSEN" / "TREPPENHAUS"),
+  //   - das Symbol oben links wird zum Haus, zur Sonne bzw. zur Treppe,
   //   - und dieselbe Silhouette liegt gross und blass im Kartenhintergrund.
   //
   // Die Silhouette ist das, was aus der Entfernung traegt: Ein Haus und eine Sonne sind auch
@@ -1409,6 +1409,19 @@
       text: 'Außen',
       symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.3v2.1M12 19.6v2.1M2.3 12h2.1M19.6 12h2.1M5.4 5.4l1.5 1.5M17.1 17.1l1.5 1.5M18.6 5.4l-1.5 1.5M6.9 17.1l-1.5 1.5"/></svg>',
       silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5.4"/><g><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/></g></svg>'
+    },
+    // TREPPENHAUS, der dritte Ort. Der Anlass: Im Haus haengen Fuehler im Wohnbereich UND im
+    // Treppenhaus, und beide sind "innen" -- zwei Haeuser nebeneinander sagten nicht, welche
+    // Zahl die vom Treppenhaus ist. Ein eigener Ort statt eines Untertyps von "innen", weil
+    // die Karte drei Zeichen traegt und alle drei verschieden sein sollen: Das Wort im Chip,
+    // das Symbol, die Silhouette. Die Treppe ist als Stufenform aus der Entfernung von Haus
+    // und Sonne zu unterscheiden -- schraeg aufsteigend, wo das Haus ein Giebel ist und die
+    // Sonne rund. Der Chip ist ein Ring wie bei INNEN (es IST innen), aber gestrichelt, damit
+    // auch die Pille eine eigene Form hat.
+    treppenhaus: {
+      text: 'Treppenhaus',
+      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21v-4.5h4.5V12H12V7.5h4.5V3H21v18z"/></svg>',
+      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 22.5v-5h4.6v-4.6h4.6V8.3h4.6V3.7h7.2v18.8z"/></svg>'
     }
   };
 
@@ -1417,12 +1430,15 @@
   const ORT_WOERTER = [
     [['aussen', 'außen', 'outdoor', 'outside', 'draussen', 'draußen', 'garten', 'balkon',
       'terrasse', 'wetterstation', 'weather_station'], 'aussen'],
+    // Vor "innen": "Treppenhaus Flur" ist ein Messpunkt im Treppenhaus, nicht irgendwo innen.
+    [['treppenhaus', 'treppe', 'stiegenhaus', 'stiege', 'staircase', 'stairwell', 'stairway',
+      'stairs'], 'treppenhaus'],
     [['innen', 'indoor', 'inside', 'wohnzimmer', 'schlafzimmer', 'kinderzimmer', 'kueche',
       'küche', 'bad', 'buero', 'büro', 'flur', 'keller', 'zimmer', 'wohnung'], 'innen']
   ];
 
   /**
-   * Der Ort einer Messkarte: 'innen', 'aussen' oder '' (keiner).
+   * Der Ort einer Messkarte: 'innen', 'aussen', 'treppenhaus' oder '' (keiner).
    *
    * Eine ausdrueckliche Einstellung gewinnt immer, auch 'kein' -- wer die Markierung abschaltet,
    * soll sie nicht zurueckbekommen, weil zufaellig "bad" im Namen steht ("Badewasser"...).
@@ -1434,7 +1450,7 @@
    */
   function ortErmitteln(settings, beschriftung, entitaet) {
     const w = settings && settings.ort;
-    if (w === 'innen' || w === 'aussen') return w;
+    if (w && Object.prototype.hasOwnProperty.call(ORTE, w)) return w;
     if (w === 'kein') return '';
     const heu = (String(beschriftung || '') + ' ' + String(entitaet || '')).toLowerCase();
     for (const [woerter, ort] of ORT_WOERTER) {
@@ -2467,11 +2483,11 @@
     card.dataset.cols = cols;
     card.dataset.rows = rows;
 
-    // Der Ort gilt fuer die ganze Karte. Das Symbol oben links wird zum Haus bzw. zur Sonne,
+    // Der Ort gilt fuer die ganze Karte. Das Symbol oben links wird zum Haus, zur Sonne oder zur Treppe,
     // der Chip oben rechts nennt ihn, und die Silhouette kommt am Ende hinzu (siehe
     // ortAnbringen) -- erst dann steht innerHTML, und sie darf von keinem Zweig ueberschrieben
     // werden.
-    const ortGesetzt = settings && (settings.ort === 'innen' || settings.ort === 'aussen');
+    const ortGesetzt = !!(settings && settings.ort && Object.prototype.hasOwnProperty.call(ORTE, settings.ort));
     const ort = ORT_TYPEN.includes(type)
       ? ortErmitteln(settings, (settings.name && String(settings.name).trim()) || (opts.namen && opts.namen[entity_id]) || attrs.friendly_name, entity_id)
       : ((ORT_TYPEN_WAHL.includes(type) && ortGesetzt) ? settings.ort : '');
@@ -3578,7 +3594,7 @@
     defaultCardType, allowedCardTypes, defaultSize, buildCard,
     sizeToSpan, minSpanFor, clampSpan, resolveSpan, schonerSpanne, SCHONER_SPALTEN, SCHONER_ZEILEN, thresholdColor,
     domainsForType, typesForEntity, renderClockNow, sensorAkzente, SENSOR_FARBEN, SENSOR_FARBEN_HELL, isSolar,
-    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN,
+    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE,
     sensornameDeutsch, SENSORNAMEN,
     ORT_TYPEN_WAHL,
     DETAIL_TYPEN,

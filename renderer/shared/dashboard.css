@@ -370,9 +370,9 @@ body { background: var(--page-bg-image, none) center/cover fixed, var(--bg); }
    Akzent schon nach dem Wert, eine zweite Farbbedeutung wuerde beide unlesbar machen.
 
    1. Der Chip: groesser als ein Zustands-Chip und in Grossbuchstaben. AUSSEN ist GEFUELLT,
-      INNEN nur umrandet -- eine helle Pille gegen einen Ring erkennt man, lange bevor man das
-      Wort lesen kann.
-   2. Das Symbol oben links (Haus / Tanne) -- das macht dashboard-render.js.
+      INNEN nur umrandet, TREPPENHAUS gestrichelt umrandet -- eine helle Pille gegen einen
+      Ring erkennt man, lange bevor man das Wort lesen kann.
+   2. Das Symbol oben links (Haus / Sonne / Treppe) -- das macht dashboard-render.js.
    3. Die Silhouette: dasselbe Zeichen, gross und blass hinter dem Wert. Sie ist das, was aus
       fuenf Metern noch traegt. */
 .card .row-rechts { display: flex; align-items: center; gap: 0.8vh; min-width: 0; }
@@ -397,10 +397,15 @@ body { background: var(--page-bg-image, none) center/cover fixed, var(--bg); }
   color: var(--bg, #0b0b10);
   background: var(--text);
 }
+.card.ort-treppenhaus .ort-chip {
+  border: 2px dashed color-mix(in srgb, var(--text) 70%, transparent);
+  color: var(--text);
+  background: transparent;
+}
 /* Das Symbol oben links traegt beim Ort die Textfarbe, nicht den Akzent: Ein rotes Haus
    hiesse "innen UND warm", und genau diese Vermischung soll nicht passieren. Der Akzent
    bleibt dem Wert. */
-.card.ort-innen .row .icon, .card.ort-aussen .row .icon { color: var(--text); opacity: 0.85; }
+.card.ort-innen .row .icon, .card.ort-aussen .row .icon, .card.ort-treppenhaus .row .icon { color: var(--text); opacity: 0.85; }
 
 .card .ort-silhouette {
   position: absolute; z-index: 0; pointer-events: none;

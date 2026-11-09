@@ -44,3 +44,22 @@ test('Nur Messgroessen, die es innen UND aussen gibt, tragen einen Ort', () => {
   // Wind, Regen und Sonne gibt es nur draussen -- "AUSSEN" darauf waere Rauschen.
   ['wind', 'rain', 'solar', 'gauge', 'clock'].forEach(t => assert.ok(!R.ORT_TYPEN.includes(t), t));
 });
+
+// Der dritte Ort. Anlass: Wohnbereich und Treppenhaus sind beide "innen" -- zwei Haeuser
+// nebeneinander sagten nicht, welche Zahl die vom Treppenhaus ist.
+test('Treppenhaus ist ein eigener Ort mit eigenem Zeichen', () => {
+  assert.strictEqual(R.ortErmitteln({ ort: 'treppenhaus' }, 'Temperatur', 'sensor.temp_3'), 'treppenhaus');
+  assert.strictEqual(R.ortErmitteln({}, 'Temperatur Treppenhaus', 'sensor.temp_3'), 'treppenhaus');
+  assert.strictEqual(R.ortErmitteln({}, 'Temperatur', 'sensor.treppe_oben'), 'treppenhaus');
+  assert.strictEqual(R.ortErmitteln({}, 'Staircase', 'sensor.x'), 'treppenhaus');
+  // "Treppenhaus Flur" ist im Treppenhaus, nicht irgendwo innen -- das Treppenhaus gewinnt.
+  assert.strictEqual(R.ortErmitteln({}, 'Treppenhaus Flur', 'sensor.x'), 'treppenhaus');
+  // Jeder Ort hat alle drei Zeichen, und keines ist von einem anderen Ort geliehen.
+  const orte = Object.keys(R.ORTE);
+  assert.deepStrictEqual(orte.sort(), ['aussen', 'innen', 'treppenhaus']);
+  for (const k of ['text', 'symbol', 'silhouette']) {
+    const werte = orte.map(o => R.ORTE[o][k]);
+    werte.forEach(w => assert.ok(w && w.length > 0, `${k} fehlt`));
+    assert.strictEqual(new Set(werte).size, werte.length, `${k} doppelt`);
+  }
+});
