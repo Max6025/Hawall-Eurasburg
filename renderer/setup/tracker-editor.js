@@ -219,6 +219,9 @@ async function tractiveEinrichten(gewaehlt) {
     $('tractiveLoginBtn').disabled = false;
     if (!r.ok) return meldung('Anmeldung fehlgeschlagen: ' + (r.error || 'unbekannt'), false);
     $('tractivePasswort').value = '';
+    // Angemeldet und trotzdem keine Liste ist ein eigener Fall -- und er sagt etwas anderes
+    // als "Passwort falsch". Wer das durcheinanderbringt, sucht an der falschen Stelle.
+    if (r.warnung) return meldung(r.warnung, false);
     meldung(`Angemeldet. ${r.tracker.length} Tracker gefunden – unten auswählen und speichern.`, true);
     await zeigen({ eingerichtet: true, email });
     if (r.tracker.length === 1) auswahl.value = r.tracker[0].id;

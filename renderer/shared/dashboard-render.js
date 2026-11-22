@@ -1853,9 +1853,9 @@
    * Den Tippstrich zeichnen -- oder mit `null` wieder wegnehmen.
    *
    * Alle Masse kommen aus dem DOM und aus der ausgelieferten Reihe, keines steht hier als
-   * Zahl: Die Hoehe des Diagramms steht in `dashboard.css` (26vh), die Lage des Punktes in
-   * `data-punkte`. Eine Kopie davon hier waere derselbe Fehler wie bei `TOR_TAKT` und den
-   * HVAC-Animationen -- kein Fehler, nur etwas, das nicht mehr zusammenpasst.
+   * Zahl: Die Hoehe des Diagramms steht in `dashboard.css` (einmal, an `.dt-plot`), die Lage
+   * des Punktes in `data-punkte`. Eine Kopie davon hier waere derselbe Fehler wie bei
+   * `TOR_TAKT` und den HVAC-Animationen -- kein Fehler, nur etwas, das nicht mehr zusammenpasst.
    */
   function verlaufStrichZeichnen(box, anteil) {
     if (!box) return;
@@ -1878,7 +1878,6 @@
 
     strich.hidden = marke.hidden = tipp.hidden = false;
     strich.style.left = (x * 100).toFixed(2) + '%';
-    strich.style.height = svg.clientHeight + 'px';
     marke.style.left = (x * 100).toFixed(2) + '%';
     marke.style.top = yPx.toFixed(1) + 'px';
 
@@ -1943,14 +1942,45 @@
     return `
       <div class="dt-verlauf-box" data-punkte='${esc(JSON.stringify(reihe))}'
         data-einheit="${esc(einheit || '')}" data-stellen="${esc(stellen === undefined || stellen === null ? '' : String(stellen))}">
-        <svg class="dt-verlauf" viewBox="0 0 ${B} ${H}" preserveAspectRatio="none" role="img">
-          <path d="${flaeche}" class="dt-flaeche"/>
-          <path d="${linie}" class="dt-linie"/>
-        </svg>
-        <div class="dt-strich" hidden></div>
-        <div class="dt-marke" hidden></div>
-        <div class="dt-tipp" hidden></div>
+        <div class="dt-plot">
+          <svg class="dt-verlauf" viewBox="0 0 ${B} ${H}" preserveAspectRatio="none" role="img">
+            <path d="${flaeche}" class="dt-flaeche"/>
+            <path d="${linie}" class="dt-linie"/>
+          </svg>
+          ${detailWerteachse(min, max, einheit, stellen)}
+          <div class="dt-strich" hidden></div>
+          <div class="dt-marke" hidden></div>
+          <div class="dt-tipp" hidden></div>
+        </div>
         ${detailZeitachse(punkte)}
+      </div>`;
+  }
+
+  /**
+   * Die Werteachse: der hoechste und der tiefste Wert, oben und unten am linken Rand.
+   *
+   * Ohne sie ist eine Kurve eine Form. "Geht rauf" beantwortet nicht "auf wie viel" -- und im
+   * Fenster hinter einer Statuskachel steht die Zahl sonst NIRGENDS: Dort gibt es keine
+   * Tiefst-/Mittel-/Hoechstwerte darunter wie bei einer Messkarte, nur den aktuellen Wert.
+   * Die Kurve war damit genau das, was eine Zeitachse ohne Zahlen auch waere: Verzierung.
+   *
+   * Zwei Zahlen, nicht fuenf: Eine volle Skala mit Hilfslinien kostet Hoehe, die auf einem
+   * Wandpanel die Kurve selbst braucht. Der Tippstrich beantwortet den Rest genauer, als jede
+   * Skala es koennte.
+   */
+  function detailWerteachse(min, max, einheit, stellen) {
+    if (!Number.isFinite(min) || !Number.isFinite(max)) return '';
+    const frei = stellen === undefined || stellen === null || stellen === '';
+    const schreib = (v) => (frei
+      ? Number(v).toLocaleString('de-DE', { maximumFractionDigits: 2 })
+      : String(zahlFormatieren(v, stellen))) + (einheit ? ' ' + einheit : '');
+    // Bei einer waagerechten Linie stuenden zweimal dieselbe Zahl uebereinander -- dann nur
+    // eine, denn zwei gleiche Zahlen sehen aus wie ein Fehler.
+    const gleich = Math.abs(max - min) < 1e-9;
+    return `
+      <div class="dt-werteachse" aria-hidden="true">
+        <span class="dt-wert-max">${esc(schreib(max))}</span>
+        ${gleich ? '' : `<span class="dt-wert-min">${esc(schreib(min))}</span>`}
       </div>`;
   }
 
@@ -3948,6 +3978,10 @@
       const gerundet = zahl(ms);
       raus.push({
         entity_id: s.entity_id,
+        // Seit wann dieser Zustand gilt. Das ist der Rettungsanker des Balkens: Liefert Home
+        // Assistant keinen Verlauf -- weil der Recorder ihn nicht aufhebt oder gerade
+        // aufgeraeumt hat --, weiss die Karte immer noch, seit wann es so ist.
+        seit: detailMs(s.last_changed),
         // Die Kennung der Antwortzeit reist mit: Das Fenster hinter der Kachel holt davon den
         // Verlauf, und sie hier noch einmal zu suchen hiesse, die Geschwister-Suche ein
         // zweites Mal zu schreiben.
@@ -4212,12 +4246,39 @@
     const von = jetzt - stunden * 3600000;
     const zustand = STATUS_ZUSTAENDE[m.zustand] || null;
 
-    const felder = statusBalken(d && d.zustandsVerlauf, von, jetzt, STATUS_BALKEN_FELDER);
+    // Der JETZIGE Zustand kommt IMMER dazu, mit dem Zeitpunkt, seit dem er gilt.
+    //
+    // Liegt der Verlauf vor, aendert das nichts -- sein letzter Punkt sagt dasselbe. Fehlt er
+    // aber (der Recorder hebt ihn nicht auf, hat gerade aufgeraeumt, oder Home Assistant
+    // antwortet nicht), waere der Balken durchgehend grau und das Fenster eine Seite voller
+    // "unbekannt". Dabei WEISS die Karte, was gerade ist und seit wann: Das steht in der
+    // Entitaet selbst. "Keine Daten" zu melden, obwohl welche dastehen, ist der schlechtere
+    // Fehler -- und genau so stand es auf dem Geraet.
+    const punkte = (d && Array.isArray(d.zustandsVerlauf) ? d.zustandsVerlauf.slice() : []);
+    // Zwei Bedingungen, und beide sind in der Probe durchgefallen, bevor sie dastanden:
+    //
+    //   `seit` muss BEKANNT sein. Sonst waere die Annahme "gilt schon den ganzen Zeitraum",
+    //   und ein Balken, der aus nichts durchgehend gruen wird, ist genau die Anzeige, vor der
+    //   die graue Flaeche schuetzen soll: Er sagt "geprueft", und geprueft wurde nichts.
+    //
+    //   Und `seit` muss NEUER sein als der letzte Punkt des Verlaufs. Der Rettungsanker ist
+    //   fuer einen FEHLENDEN Verlauf da, nicht zum Nachbessern eines vorhandenen: Faellt er
+    //   auf denselben Zeitpunkt wie ein Wechsel, verdraengt er ihn -- ein Ausfall von drei
+    //   Minuten verschwand dadurch spurlos, und der Balken sah gesuender aus als die Anlage.
+    const letzterPunkt = punkte.reduce((groesster, p) => {
+      const ms = detailMs(p && p.ms !== undefined ? p.ms : (p || {}).t);
+      return Number.isFinite(ms) && ms > groesster ? ms : groesster;
+    }, -Infinity);
+    if (m.zustand && STATUS_ZUSTAENDE[m.zustand] && Number.isFinite(m.seit) && m.seit > letzterPunkt) {
+      punkte.push({ ms: Math.min(Math.max(m.seit, von), jetzt), zustand: m.zustand });
+    }
+
+    const felder = statusBalken(punkte, von, jetzt, STATUS_BALKEN_FELDER);
     // VIER, nicht sechs. Das Fenster hat eine feste Hoehe, und mit sechs Zeilen ragte die
     // letzte darunter heraus -- auf einem Wandpanel scrollt niemand, und was man nicht sieht,
     // ist so gut wie nicht da. Vier Wechsel beantworten die Frage, mit der man das Fenster
     // oeffnet: Ist das gerade erst passiert, oder wackelt das schon den ganzen Tag?
-    const ereignisse = statusEreignisse(d && d.zustandsVerlauf, 4);
+    const ereignisse = statusEreignisse(punkte, 4);
 
     const kopf = `
       <div class="std-kopf">

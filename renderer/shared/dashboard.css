@@ -873,8 +873,13 @@ body.light-theme .card .ort-silhouette, body.light-theme .card .symbol-silhouett
    die ganze Breite fuellt. Alles, was dadurch verzerrt wuerde, liegt deshalb als HTML DARUEBER
    und nicht darin: die Schrift der Achse, der runde Punkt auf der Kurve, der Tippstrich. Ein
    Kreis im SVG waere hier ein Ei, und die Uhrzeiten waeren in die Breite gezogen. */
-.dt-verlauf-box { position: relative; margin-top: 2vh; touch-action: none; }
-.dt-verlauf { width: 100%; height: 26vh; display: block; }
+.dt-verlauf-box { margin-top: 2vh; touch-action: none; }
+/* Die Hoehe steht EINMAL, hier. Vorher trug sie das SVG, und Tippstrich und Werteachse
+   mussten sie nachbauen -- zwei Zahlen, die beim naechsten Aendern auseinanderlaufen, und der
+   Strich steht dann neben der Kurve statt darauf. Der Kasten ist jetzt die Flaeche, und alles,
+   was darueber liegt, bezieht sich mit `inset` darauf. */
+.dt-plot { position: relative; height: 26vh; }
+.dt-verlauf { width: 100%; height: 100%; display: block; }
 .dt-flaeche { fill: color-mix(in srgb, var(--kachel-akzent, #4f7cff) 22%, transparent); stroke: none; }
 .dt-linie { fill: none; stroke: var(--kachel-akzent, #4f7cff); stroke-width: 2.4;
   vector-effect: non-scaling-stroke; stroke-linejoin: round; }
@@ -889,9 +894,24 @@ body.light-theme .card .ort-silhouette, body.light-theme .card .symbol-silhouett
 .dt-achse span.dt-achse-a { transform: none; }
 .dt-achse span.dt-achse-e { transform: translateX(-100%); }
 
+/* Die Werteachse. Am LINKEN Rand und innerhalb der Flaeche: Rechts endet die Kurve mit dem
+   aktuellen Wert, dort laege die Zahl am haeufigsten auf der Linie. Der kleine Schatten
+   dahinter haelt sie lesbar, wo die Kurve trotzdem vorbeikommt -- ein deckender Kasten waere
+   ein Loch in der Flaeche. */
+.dt-werteachse { position: absolute; left: 0.8vh; top: 0; bottom: 0;
+  display: flex; flex-direction: column; justify-content: space-between;
+  pointer-events: none; font-size: 1.4vh; color: var(--muted);
+  font-variant-numeric: tabular-nums; }
+/* Der hoechste Wert liegt am oberen Rand der Zeichnung, der tiefste 26 von 300 Einheiten
+   ueber dem unteren (OBEN/UNTEN in detailVerlaufSvg) -- die Zahlen ruecken entsprechend ein,
+   sonst stehen sie neben der Kurve statt auf ihrer Hoehe. */
+.dt-wert-max { padding-top: 0.2vh; }
+.dt-wert-min { padding-bottom: 1.6vh; }
+.dt-werteachse span { text-shadow: 0 0 6px var(--bg), 0 0 3px var(--bg); }
+
 /* Der Tippstrich. Gestrichelt und in der Textfarbe, nicht im Kartenakzent: Er gehoert nicht
    zur Messung, er ist das Lineal, das man daran haelt. */
-.dt-strich { position: absolute; top: 0; height: 26vh; width: 0;
+.dt-strich { position: absolute; top: 0; bottom: 0; width: 0;
   border-left: 1px dashed color-mix(in srgb, var(--text) 45%, transparent);
   pointer-events: none; }
 /* Der Punkt liegt auf der gefuellten Flaeche, also in derselben Farbe wie sein eigener Ring.
@@ -1242,7 +1262,7 @@ body.light-theme .st, body.light-theme .std {
    feste Hoehe. Mit 26vh ragten die letzten Zeilen darunter heraus; auf einem Wandpanel
    scrollt niemand, und was man nicht sieht, ist so gut wie nicht da. Nachgemessen in der
    Probe (`scrollHeight` gegen `clientHeight`), nicht geschaetzt. */
-.std .dt-verlauf { height: 19vh; }
+.std .dt-plot { height: 19vh; }
 
 .std-ereignisse { display: flex; flex-direction: column; }
 .std-ereignis { display: flex; align-items: center; gap: 1.2vh; padding: 1vh 0;

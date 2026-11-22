@@ -440,7 +440,11 @@ test('Der Zustandsverlauf kommt über DENSELBEN Pfad wie der Zahlenverlauf', () 
   // war das nicht davon zu unterscheiden, dass Home Assistant keinen Verlauf hat.
   const server = lies('server', 'setup-server.js');
   assert.match(server, /req\.query\.text/, 'die Route kennt den Textfall nicht');
-  assert.match(server, /alsText \? \{ t: p\.last_changed, z: String\(p\.state\) \}/);
+  // Das Feld heißt `zustand`, nicht `z`. Beim ersten Anlauf hieß es `z`, und die Anzeige las
+  // `zustand` -- jeder Punkt fiel durch den Filter, der Balken war grau, und darunter stand
+  // „kein Verlauf". Dass beide Seiten denselben Namen meinen, prüft test/server-verlauf.js
+  // am echten Weg; hier steht nur, dass es diesen einen Namen überhaupt gibt.
+  assert.match(server, /alsText \? \{ t: p\.last_changed, zustand: String\(p\.state\) \}/);
   const dash = lies('renderer', 'dashboard.html');
   assert.match(dash, /async function ensureZustandsverlauf/);
   assert.match(dash, /&text=1/);

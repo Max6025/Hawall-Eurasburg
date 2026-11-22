@@ -46,6 +46,7 @@
     <a href="?fall=viele">60 Dienste</a><a href="?fall=wenige">5 Dienste</a>
     <a href="?fall=leer">nichts gefunden</a>
     <a href="?fall=stoerung&hell=1">hell</a><a href="?fall=stoerung&weit=1">weit weg</a>
+    <a href="?fall=stoerung&ohneverlauf=1">ohne HA-Verlauf</a>
   </div>
   <div class="app"><div class="main">
     <header class="statusbar"><div id="title">Hausstatus</div></header>
@@ -96,6 +97,9 @@
       const zustand = kaputt.includes(name) ? 'down'
         : (i === 4 ? 'pending' : (i === 9 ? 'maintenance' : 'up'));
       setze(b + '_status', zustand, { friendly_name: name + ' Status' });
+      // Seit wann dieser Zustand gilt -- Home Assistant liefert das an jeder Entität, und der
+      // Balken fällt darauf zurück, wenn es keinen Verlauf gibt.
+      z[b + '_status'].last_changed = new Date(Date.now() - (3 + (i % 7)) * 3600000).toISOString();
       setze(b + '_antwortzeit', String(Math.round(4 + Math.abs(Math.sin(i * 1.7)) * 480)),
         { friendly_name: name + ' Antwortzeit', unit_of_measurement: 'ms' });
       setze(b + '_verfugbarkeit_30_tage', (99.99 - Math.abs(Math.sin(i * 2.3)) * 3.4).toFixed(2),
@@ -162,7 +166,11 @@
   // Der Verlauf wird hier ERFUNDEN: ein paar Wechsel in den letzten 24 Stunden. Auf dem Gerät
   // kommt er aus Home Assistant (`/api/ha/history?...&text=1`).
   const JETZT = Date.now();
+  // ?ohneverlauf stellt den Fall vom Gerät nach: Home Assistant gibt nichts her. Dann muss
+  // der Balken trotzdem etwas zeigen -- aus `last_changed` der Entität.
+  const OHNE_VERLAUF = P.has('ohneverlauf');
   function verlaufFuer(name) {
+    if (OHNE_VERLAUF) return [];
     const b = kennung(name);
     const z = zustaende[b + '_status'];
     const ende = z ? z.state : 'up';

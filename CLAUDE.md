@@ -717,6 +717,47 @@ sehen ist, gehört dagegen ausdrücklich **nicht** hierher — das ist Sache des
   ohne es zu sagen. Die Probe (`.scratch/statusseite/probe.html`) hat das Fenster mit, samt
   einem erfundenen Ausfall von drei Minuten vor drei Stunden — dem Fall, an dem man sieht, ob
   ein Feld ihn trägt oder verschluckt.
+- **„Keine Daten" zu melden, obwohl welche dastehen, ist der schlechtere Fehler.** Der Balken
+  hinter einer Statuskachel war auf dem Gerät durchgehend grau, darunter stand „Für diesen
+  Zeitraum liegt kein Verlauf vor". Zwei Dinge steckten dahinter, und das zweite ist die
+  eigentliche Lehre:
+  1. **Der Server schickte das Feld als `z`, die Anzeige las `zustand`.** Jeder Punkt fiel durch
+     den Filter. Nichts war kaputt — beide Seiten meinten nur verschiedene Namen. Die Modultests
+     sahen es nicht (jede Hälfte war für sich in Ordnung), und die **Probe sah es auch nicht,
+     weil sie ihre Daten erfand** und dabei `zustand` schrieb: Sie prüfte damit nicht den Weg,
+     sondern sich selbst. `test/server-verlauf.test.js` geht ihn jetzt ganz — was der Server
+     liefert, geht dort direkt in `statusBalken()`, und ein umbenanntes Feld macht den Balken
+     grau, worauf der Test anschlägt.
+  2. **Der jetzige Zustand kommt immer dazu**, mit `last_changed` als Zeitpunkt. Liegt der
+     Verlauf vor, ändert das nichts — sein letzter Punkt sagt dasselbe. Fehlt er (der Recorder
+     hebt ihn nicht auf, hat gerade aufgeräumt, Home Assistant antwortet nicht), wäre die Seite
+     sonst voller „unbekannt", obwohl die Entität weiß, was gerade ist und seit wann.
+     Zwei Bedingungen, beide in der Probe durchgefallen, bevor sie dastanden: `last_changed` muss
+     **bekannt** sein (sonst wäre die Annahme „gilt schon den ganzen Zeitraum", und ein Balken,
+     der aus nichts durchgehend grün wird, ist genau die Anzeige, vor der die graue Fläche
+     schützen soll), und es muss **neuer** sein als der letzte Punkt des Verlaufs — fällt es auf
+     denselben Zeitpunkt wie ein Wechsel, verdrängt es ihn, und ein Ausfall von drei Minuten
+     verschwand spurlos. Der Rettungsanker ist für einen *fehlenden* Verlauf da, nicht zum
+     Nachbessern eines vorhandenen.
+- **Eine Kurve ohne Werteachse ist eine Form.** `detailWerteachse()` setzt den höchsten und den
+  tiefsten Wert an den linken Rand der Zeichnung. Im Fenster hinter einer Statuskachel stand die
+  Größenordnung sonst **nirgends**: Dort gibt es keine Tiefst-/Mittel-/Höchstwerte darunter wie
+  bei einer Messkarte, nur den aktuellen Wert. Zwei Zahlen, nicht fünf — eine volle Skala mit
+  Hilfslinien kostet Höhe, die auf einem Wandpanel die Kurve selbst braucht, und der Tippstrich
+  beantwortet den Rest genauer. Dabei bekam die Zeichnung einen eigenen Kasten (`.dt-plot`), der
+  die Höhe **einmal** trägt: Vorher stand sie am SVG, und Tippstrich und Werteachse mussten sie
+  nachbauen — dieselbe Falle wie bei `TOR_TAKT`.
+- **Tractive soll selbst sagen, warum es ablehnt.** Die Meldung lautete pauschal „E-Mail oder
+  Passwort falsch", und zurück kam: *„sagt angeblich, das Passwort sei nicht korrekt, obwohl es
+  korrekt ist."* Damit war die Fehlersuche zu Ende, denn die Meldung behauptete etwas, das sie
+  nicht wissen kann. Jetzt steht dort Tractives eigener Text samt Code (`8001, SECURITY`) und
+  der HTTP-Status. Dazu zwei Hinweise, die den häufigsten Fall abdecken: ein **Leerzeichen am
+  Rand** des Passworts wird benannt (abgeschnitten wird es nicht — es könnte dazugehören), und
+  wer sich bei Tractive mit **Apple oder Google** anmeldet, hat dort gar kein Passwort.
+  Und die Anmeldung ist von der Trackerliste **getrennt**: Vorher lagen beide in einem `try`,
+  und scheiterte die Liste, stand „Anmeldung fehlgeschlagen" auf dem Schirm — wer sein Passwort
+  kennt, sucht dann an der falschen Stelle. Die Zugangsdaten werden gespeichert, sobald die
+  Anmeldung durch ist; die Liste darf einzeln danebengehen.
 - **Karten brauchen mehr als ihren Zustand, und das steht an einer Stelle.** `kartenZusatz()`
   in `dashboard.html` holt Verlauf, Vorhersage, Mülltermine und Energiequellen. Zwei Flächen
   bauen Karten — das Dashboard und der Bildschirmschoner —, und die zweite Fläche holte in
@@ -1412,7 +1453,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-654 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+659 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

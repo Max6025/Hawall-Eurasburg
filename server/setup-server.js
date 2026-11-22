@@ -552,10 +552,16 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       // Derselbe Pfad und dieselbe Antwortform, nur ein anderes Feld: Zwei Routen fuer
       // denselben Abruf liefen beim naechsten Umbau auseinander.
       const alsText = String(req.query.text || '') === '1';
+      // Das Feld heisst `zustand` und nicht `z`. Beim ersten Anlauf hiess es `z`, und die
+      // Anzeige las `zustand` -- jeder Punkt fiel durch den Filter, der Balken war durchgehend
+      // grau, und darunter stand "Für diesen Zeitraum liegt kein Verlauf vor". Nichts war
+      // kaputt, die beiden Seiten meinten nur verschiedene Namen. Gemerkt hat es niemand, weil
+      // die Probe ihre eigenen Daten erfand: Sie schrieb `zustand` und prüfte damit nicht den
+      // Weg, sondern sich selbst. Ein Test geht jetzt den ECHTEN Weg (test/server-verlauf).
       const series = (data[0] || [])
-        .map(p => alsText ? { t: p.last_changed, z: String(p.state) }
+        .map(p => alsText ? { t: p.last_changed, zustand: String(p.state) }
           : { t: p.last_changed, v: parseFloat(p.state) })
-        .filter(p => alsText ? !!p.z : !isNaN(p.v));
+        .filter(p => alsText ? !!p.zustand : !isNaN(p.v));
       res.json({ ok: true, series });
     } catch (err) {
       res.status(500).json({ ok: false, error: String(err.message || err) });
@@ -1006,14 +1012,23 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
   app.post('/api/tractive/login', async (req, res) => {
     const { email, passwort } = req.body || {};
     if (!email || !passwort) return res.status(400).json({ ok: false, error: 'E-Mail und Passwort erforderlich' });
+    // ZWEI Schritte, und sie werden getrennt gemeldet. Vorher lagen sie in einem `try`: Ging
+    // die Anmeldung durch und scheiterte danach die Trackerliste, stand trotzdem "Anmeldung
+    // fehlgeschlagen" auf dem Schirm -- und wer sein Passwort kennt, sucht dann an der
+    // falschen Stelle. Die Zugangsdaten werden deshalb gespeichert, sobald die ANMELDUNG
+    // geklappt hat; die Liste ist der zweite Schritt und darf einzeln danebengehen.
     try {
       await tractive.anmelden(String(email), String(passwort));
-      const liste = await tractive.tracker();
-      store.set('tractiveEmail', String(email));
-      store.set('tractivePasswort', String(passwort));
-      res.json({ ok: true, tracker: liste });
     } catch (err) {
-      res.json({ ok: false, error: String(err.message || err) });
+      return res.json({ ok: false, error: String(err.message || err) });
+    }
+    store.set('tractiveEmail', String(email));
+    store.set('tractivePasswort', String(passwort));
+    try {
+      res.json({ ok: true, tracker: await tractive.tracker() });
+    } catch (err) {
+      res.json({ ok: true, tracker: [], warnung: 'Angemeldet, aber die Trackerliste kam nicht: '
+        + String(err.message || err) });
     }
   });
 

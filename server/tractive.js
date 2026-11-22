@@ -47,6 +47,33 @@ function erzeugeTractive(optionen) {
     return text ? JSON.parse(text) : null;
   }
 
+  /**
+   * Was Tractive zu einer abgelehnten Anmeldung SELBST sagt.
+   *
+   * Vorher stand dort nur unsere eigene Deutung ("E-Mail oder Passwort falsch"). Gemeldet
+   * wurde daraufhin: "sagt angeblich, das Passwort sei nicht korrekt, obwohl es korrekt ist" --
+   * und damit war die Fehlersuche zu Ende, denn die Meldung behauptete etwas, das sie gar
+   * nicht wissen kann. Tractive schickt einen eigenen Code und Text mit; der gehoert dem
+   * Nutzer gezeigt, nicht verschluckt (siehe CLAUDE.md, "ein stilles false").
+   */
+  async function fehlertext(r) {
+    let d = null;
+    try { d = JSON.parse(await r.text()); } catch (e) { d = null; }
+    const teile = [];
+    if (d && d.message) teile.push(String(d.message));
+    if (d && d.code !== undefined && d.code !== null) teile.push('Code ' + d.code);
+    teile.push('HTTP ' + r.status);
+    return teile.join(', ');
+  }
+
+  // Ein Passwort mit Leerzeichen davor oder dahinter ist erlaubt -- und fast immer ein
+  // Versehen beim Einfuegen. Abschneiden duerfen wir es nicht (es koennte dazugehoeren), aber
+  // darauf hinweisen schon: Sonst sucht man den Fehler ueberall, nur nicht im Eingabefeld.
+  function randLeerzeichen(wert) {
+    const s = String(wert === undefined || wert === null ? '' : wert);
+    return s !== s.trim();
+  }
+
   /** Anmelden. Wirft bei falschen Zugangsdaten. */
   async function anmelden(email, passwort) {
     const r = await holen(BASIS + 'auth/token', {
@@ -54,7 +81,15 @@ function erzeugeTractive(optionen) {
       headers: kopf(false),
       body: JSON.stringify({ platform_email: email, platform_token: passwort, grant_type: 'tractive' })
     });
-    if (r.status === 401 || r.status === 403) throw new Error('Tractive: E-Mail oder Passwort falsch');
+    if (r.status === 401 || r.status === 403) {
+      const was = await fehlertext(r);
+      const dazu = [];
+      if (randLeerzeichen(passwort)) dazu.push('Das Passwort faengt mit einem Leerzeichen an oder hoert mit einem auf');
+      if (randLeerzeichen(email)) dazu.push('Die E-Mail hat ein Leerzeichen am Rand');
+      dazu.push('Wer sich bei Tractive mit Apple oder Google anmeldet, hat dort kein eigenes Passwort -- '
+        + 'dann in der Tractive-App eines vergeben');
+      throw new Error(`Tractive hat die Anmeldung abgelehnt (${was}). ${dazu.join('. ')}.`);
+    }
     if (!r.ok) throw new Error(`Tractive antwortete bei der Anmeldung mit Status ${r.status}`);
     const d = await r.json();
     if (!d || !d.access_token || !d.user_id) throw new Error('Tractive: unerwartete Antwort bei der Anmeldung');

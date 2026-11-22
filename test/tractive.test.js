@@ -42,11 +42,35 @@ test('Die Anmeldung schickt, was Tractive erwartet, und merkt sich Token und Ben
   assert.strictEqual(danach.init.headers['x-tractive-user'], 'u1');
 });
 
-test('Falsches Passwort: Fehler, keine Sitzung', async () => {
-  const { holen } = attrappe(() => antwort(401, { message: 'nope' }));
+test('Abgelehnte Anmeldung: Fehler, keine Sitzung -- und Tractive kommt zu Wort', async () => {
+  // Vorher stand dort nur unsere eigene Deutung: „E-Mail oder Passwort falsch". Gemeldet
+  // wurde daraufhin „sagt angeblich, das Passwort sei falsch, obwohl es korrekt ist" -- und
+  // damit war die Fehlersuche zu Ende, denn die Meldung behauptete etwas, das sie nicht
+  // wissen kann. Jetzt steht da, was Tractive selbst sagt, samt Code.
+  const { holen } = attrappe(() => antwort(403, { code: 8001, message: 'The provided credentials are invalid.' }));
   const t = erzeugeTractive({ fetch: holen });
-  await assert.rejects(() => t.anmelden('a', 'b'), /E-Mail oder Passwort/);
+  await assert.rejects(() => t.anmelden('a@b.c', 'geheim'), (e) => {
+    assert.match(e.message, /abgelehnt/);
+    assert.match(e.message, /The provided credentials are invalid\./, 'Tractives eigener Text fehlt');
+    assert.match(e.message, /Code 8001/);
+    assert.match(e.message, /HTTP 403/);
+    assert.match(e.message, /Apple oder Google/, 'der häufigste Grund fehlt');
+    return true;
+  });
   assert.strictEqual(t.angemeldet(), false);
+});
+
+test('Ein Leerzeichen am Rand des Passworts wird BENANNT, nicht abgeschnitten', async () => {
+  // Abschneiden dürfen wir es nicht -- es könnte dazugehören. Aber wer es nicht sieht, sucht
+  // den Fehler überall, nur nicht im Eingabefeld.
+  const { holen, aufrufe } = attrappe(() => antwort(403, { code: 8001, message: 'nope' }));
+  const t = erzeugeTractive({ fetch: holen });
+  await assert.rejects(() => t.anmelden('a@b.c', ' geheim'), /Leerzeichen/);
+  assert.strictEqual(JSON.parse(aufrufe[0].init.body).platform_token, ' geheim',
+    'das Passwort muss unverändert rausgehen');
+  // Ohne Leerzeichen steht der Hinweis auch nicht da -- sonst ist er Rauschen.
+  const zwei = erzeugeTractive({ fetch: attrappe(() => antwort(403, { code: 8001, message: 'nope' })).holen });
+  await assert.rejects(() => zwei.anmelden('a@b.c', 'geheim'), (e) => !/Leerzeichen/.test(e.message));
 });
 
 test('Der Verlauf fragt in Unix-Sekunden als json_segments und liefert Punkte', async () => {
