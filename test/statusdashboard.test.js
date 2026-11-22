@@ -330,3 +330,147 @@ test('Jede Klasse der Statusseite hat eine Regel im CSS', () => {
   const verwaist = [...imCss].filter(k => !imJs.has(k));
   assert.deepStrictEqual(verwaist, [], 'CSS-Regeln ohne Verwendung: ' + verwaist.join(', '));
 });
+
+// --- Was hinter einer Kachel steckt ----------------------------------------------------------
+//
+// Angetippt zeigt eine Kachel den Balken der letzten 24 Stunden, die Antwortzeit als Kurve und
+// die letzten Wechsel. Vorbild war die Statusseite von Uptime Kuma -- mit EINEM Unterschied,
+// der hier die meisten Tests trägt: Dort ist jedes Feld eine Prüfung, hier ein Zeitabschnitt.
+
+const STUNDE = 3600000;
+const JETZT = Date.parse('2026-11-22T16:00:00Z');
+const w = (stundenVorher, zustand) => ({ t: new Date(JETZT - stundenVorher * STUNDE).toISOString(), zustand });
+
+test('Ein Ausfall von drei Minuten färbt sein Feld', () => {
+  // Der Grund für die Zeitabschnitte. Hätte jedes Feld eine Prüfung zu zeigen, verschwände
+  // ein kurzer Ausfall zwischen zwei Prüfungen -- und genau der ist der interessante.
+  const verlauf = [w(24, 'up'), w(3, 'down'), { t: new Date(JETZT - 3 * STUNDE + 180000).toISOString(), zustand: 'up' }];
+  const felder = R.statusBalken(verlauf, JETZT - 24 * STUNDE, JETZT, 48);
+  assert.strictEqual(felder.length, 48);
+  assert.strictEqual(felder.filter(f => f.zustand === 'down').length, 1);
+  assert.strictEqual(felder.filter(f => f.zustand === 'up').length, 47);
+});
+
+test('Der schlechteste Zustand gewinnt im Feld', () => {
+  // Ein Abschnitt, in dem es kurz aus war, ist nicht halb in Ordnung.
+  const verlauf = [w(24, 'up'), w(2, 'pending'), w(1.9, 'down'), w(1.8, 'up')];
+  const felder = R.statusBalken(verlauf, JETZT - 24 * STUNDE, JETZT, 24);  // eine Stunde je Feld
+  const betroffen = felder.filter(f => f.von < JETZT - 1.5 * STUNDE && f.bis > JETZT - 2 * STUNDE);
+  assert.ok(betroffen.length);
+  assert.ok(betroffen.some(f => f.zustand === 'down'), 'der Ausfall muss durchschlagen');
+});
+
+test('Nichts bekannt ist NICHT "erreichbar"', () => {
+  // Ein grünes Feld für einen Zeitraum, aus dem kein Verlauf vorliegt, wäre eine Behauptung
+  // über etwas, das niemand gemessen hat.
+  const felder = R.statusBalken([w(6, 'up')], JETZT - 24 * STUNDE, JETZT, 24);
+  assert.strictEqual(felder.filter(f => f.zustand === '').length, 18, 'die ersten 18 Stunden sind unbekannt');
+  assert.strictEqual(felder.filter(f => f.zustand === 'up').length, 6);
+  const h = R.statusDetail({ monitor: { name: 'X', zustand: 'up', ms: 10, quote: 99 },
+    zustandsVerlauf: [], msVerlauf: [], jetzt: JETZT });
+  assert.match(h, /liegt kein Verlauf vor/, 'ein durchgehend grauer Balken braucht ein Wort dazu');
+});
+
+test('Ein kaputter Zeitraum ergibt keinen Balken statt eines falschen', () => {
+  for (const [a, b] of [[JETZT, JETZT], [JETZT, JETZT - STUNDE], [NaN, JETZT], [JETZT - STUNDE, undefined]]) {
+    assert.deepStrictEqual(R.statusBalken([w(1, 'up')], a, b, 24), []);
+  }
+});
+
+test('Die Ereignisliste zeigt nur WECHSEL, neueste zuerst', () => {
+  // Home Assistant meldet denselben Zustand auch dann noch einmal, wenn sich nur ein Attribut
+  // gerührt hat -- bei einem Monitor die Antwortzeit, also ständig. Zweihundert Zeilen
+  // "Erreichbar" beantworten keine Frage.
+  const verlauf = [w(10, 'up'), w(9, 'up'), w(8, 'up'), w(5, 'down'), w(4, 'down'), w(3, 'up')];
+  const e = R.statusEreignisse(verlauf, 6);
+  assert.deepStrictEqual(e.map(x => x.zustand), ['up', 'down', 'up']);
+  assert.ok(e[0].ms > e[1].ms, 'neueste zuerst');
+});
+
+test('Das Fenster zeigt höchstens VIER Ereignisse', () => {
+  // Es hat eine feste Höhe, und mit sechs Zeilen ragte die letzte darunter heraus. Auf einem
+  // Wandpanel scrollt niemand. In der Probe nachgemessen, nicht geschätzt.
+  const verlauf = [];
+  for (let i = 20; i > 0; i--) verlauf.push(w(i, i % 2 ? 'up' : 'down'));
+  const h = R.statusDetail({ monitor: { name: 'X', zustand: 'up', ms: 10, quote: 99 },
+    zustandsVerlauf: verlauf, msVerlauf: [], jetzt: JETZT });
+  assert.strictEqual((h.match(/class="std-ereignis /g) || []).length, 4);
+});
+
+test('Das Fenster nennt den Zeitraum, den der Balken wirklich zeigt', () => {
+  // "Letzte 24 Stunden", nicht "letzte 20 Prüfungen": Ein Balken, der etwas anderes zählt,
+  // als seine Beschriftung sagt, ist schlimmer als keiner.
+  const h = R.statusDetail({ monitor: { name: 'Pi-hole', zustand: 'down', ms: 480, quote: 97.45 },
+    zustandsVerlauf: [w(24, 'up'), w(1, 'down')], msVerlauf: [], stunden: 24, jetzt: JETZT });
+  assert.match(h, /Letzte 24 Stunden/);
+  assert.match(h, /vor 24 Std\./);
+  assert.ok(!/Prüfung/.test(h));
+  assert.match(h, /Ausgefallen/, 'der Zustand steht als Chip im Kopf');
+  assert.match(h, /97,45 %/);
+  assert.match(h, /480 ms/);
+});
+
+test('Auch hier wird fremder Text maskiert', () => {
+  const h = R.statusDetail({ monitor: { name: '<img src=x>', zustand: 'up', ms: null, quote: null },
+    zustandsVerlauf: [], msVerlauf: [], jetzt: JETZT });
+  assert.ok(!/<img/.test(h));
+  assert.ok(!/NaN/.test(h), 'fehlende Zahlen werden zum Strich');
+});
+
+test('Die Antwortzeit-Kurve ist dieselbe wie im Detailfenster einer Karte', () => {
+  // Sie hier nachzubauen wäre eine zweite Wahrheit -- samt Zeitachse und Tippstrich.
+  const ms = Array.from({ length: 20 }, (_, i) =>
+    ({ t: new Date(JETZT - (19 - i) * STUNDE).toISOString(), v: 40 + i }));
+  const h = R.statusDetail({ monitor: { name: 'X', zustand: 'up', ms: 59, quote: 99 },
+    zustandsVerlauf: [w(24, 'up')], msVerlauf: ms, jetzt: JETZT });
+  assert.match(h, /dt-verlauf-box/, 'keine Kurve');
+  assert.match(h, /dt-achse/, 'keine Zeitachse');
+  assert.match(h, /data-einheit="ms"/, 'der Tippstrich kennt die Einheit nicht');
+});
+
+test('Die Kachel trägt ihre Kennung, damit das Antippen weiß, wen es meint', () => {
+  const z = welt((x) => monitor(x, 'sensor.pi_hole', 'Pi-hole', 'up'));
+  assert.match(R.statusAnsicht(z, {}), /data-entity="sensor\.pi_hole_status"/);
+  // Und die Kennung der Antwortzeit reist mit -- das Fenster holt davon den Verlauf.
+  assert.strictEqual(R.statusMonitore(z)[0].msId, 'sensor.pi_hole_antwortzeit');
+});
+
+test('Der Zustandsverlauf kommt über DENSELBEN Pfad wie der Zahlenverlauf', () => {
+  // `parseFloat('up')` ist NaN -- ohne den Textzweig kam die Reihe leer zurück, und von außen
+  // war das nicht davon zu unterscheiden, dass Home Assistant keinen Verlauf hat.
+  const server = lies('server', 'setup-server.js');
+  assert.match(server, /req\.query\.text/, 'die Route kennt den Textfall nicht');
+  assert.match(server, /alsText \? \{ t: p\.last_changed, z: String\(p\.state\) \}/);
+  const dash = lies('renderer', 'dashboard.html');
+  assert.match(dash, /async function ensureZustandsverlauf/);
+  assert.match(dash, /&text=1/);
+});
+
+test('Das Fenster hinter der Kachel ist DASSELBE wie bei den Karten', () => {
+  // Samt 30-Sekunden-Uhr, Escape und Tippen daneben. Ein zweites Fenster wäre ein zweiter
+  // Satz Fluchtwege, und einer davon würde vergessen.
+  const dash = lies('renderer', 'dashboard.html');
+  assert.match(dash, /async function statusDetailOeffnen/);
+  assert.match(dash, /detailLaeuft = \{ art: 'status'/);
+  assert.match(dash, /statusDetailOeffnen\(kachel\.dataset\.entity\)/, 'die Kachel ist nicht verdrahtet');
+  const i = dash.indexOf('async function detailAktualisieren');
+  const block = dash.slice(i, i + 1200);
+  assert.ok(block.includes("detailLaeuft.art === 'status'"), 'der Neuaufbau kennt den Statusfall nicht');
+  assert.ok(block.includes('STATUS_DETAIL_STUNDEN'), 'beide Abrufe müssen denselben Zeitraum nehmen');
+});
+
+test('Jede Klasse des Kachel-Fensters hat eine Regel im CSS', () => {
+  const js = lies('renderer', 'shared', 'dashboard-render.js');
+  const css = lies('renderer', 'shared', 'dashboard.css');
+  const teil = js.slice(js.indexOf('Was hinter einer Kachel steckt'), js.indexOf('global.DashboardRender = {'));
+  assert.ok(teil.length > 2000, 'der Abschnitt wurde nicht gefunden');
+  const imJs = new Set();
+  for (const m of teil.matchAll(/class="([^"]*)"/g)) {
+    for (const k of m[1].replace(/\$\{[^}]*\}/g, ' ').split(/\s+/)) if (/^std(-|$)/.test(k)) imJs.add(k);
+  }
+  for (const m of teil.matchAll(/'(std-[\w-]+)'/g)) imJs.add(m[1]);
+  const imCss = new Set();
+  for (const m of css.matchAll(/\.(std(?:-[\w-]+)?)(?![\w-])/g)) imCss.add(m[1]);
+  assert.deepStrictEqual([...imJs].filter(k => !imCss.has(k)), [], 'Klassen ohne CSS-Regel');
+  assert.deepStrictEqual([...imCss].filter(k => !imJs.has(k)), [], 'CSS-Regeln ohne Verwendung');
+});

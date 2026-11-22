@@ -544,9 +544,18 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       const r = await haFetch(haUrl, token, `/api/history/period/${start}?filter_entity_id=${encodeURIComponent(entity_id)}&minimal_response`);
       if (!r.ok) return res.json({ ok: false, error: `HA antwortete mit Status ${r.status}` });
       const data = await r.json();
+      // `text=1` fuer Entitaeten, deren Zustand KEINE Zahl ist -- ein Uptime-Kuma-Monitor
+      // meldet "up"/"down"/"pending". Ohne diesen Zweig warf `parseFloat` genau die Punkte
+      // weg, aus denen der Balken auf der Statusseite besteht: Alles war NaN, die Reihe leer,
+      // und von aussen sah es aus, als haette Home Assistant keinen Verlauf.
+      //
+      // Derselbe Pfad und dieselbe Antwortform, nur ein anderes Feld: Zwei Routen fuer
+      // denselben Abruf liefen beim naechsten Umbau auseinander.
+      const alsText = String(req.query.text || '') === '1';
       const series = (data[0] || [])
-        .map(p => ({ t: p.last_changed, v: parseFloat(p.state) }))
-        .filter(p => !isNaN(p.v));
+        .map(p => alsText ? { t: p.last_changed, z: String(p.state) }
+          : { t: p.last_changed, v: parseFloat(p.state) })
+        .filter(p => alsText ? !!p.z : !isNaN(p.v));
       res.json({ ok: true, series });
     } catch (err) {
       res.status(500).json({ ok: false, error: String(err.message || err) });

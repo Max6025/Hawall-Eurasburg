@@ -1071,8 +1071,12 @@ body.tracker-an .unterleiste:empty { flex: 0 0 0; padding: 0; }
 .st { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1.2vh; }
 
 /* Die vier Zustandsfarben. Dieselben wie im Energiediagramm -- zwei Gruentoene im selben
-   System waeren zwei Aussagen, die gleich aussehen. */
-.st {
+   System waeren zwei Aussagen, die gleich aussehen.
+   Gesetzt fuer BEIDE Flaechen: die Seite selbst (.st) und das Fenster hinter einer Kachel
+   (.std). Das Fenster liegt nicht in der Seite, sondern im Detailfenster ganz woanders im
+   Dokument -- ohne diese Zeile waeren dort alle vier Variablen leer, und die Farben fielen
+   stillschweigend auf ihre Vorgaben zurueck. */
+.st, .std {
   --st-up: #57c98a;
   --st-down: #e8623c;
   --st-pending: #f5b544;
@@ -1080,7 +1084,7 @@ body.tracker-an .unterleiste:empty { flex: 0 0 0; padding: 0; }
 }
 /* Auf hellem Grund tragen dieselben Toene zu wenig -- besonders das Gelb verschwindet fast.
    Nachgedunkelt, nicht ausgetauscht: Es soll dieselbe Farbe bleiben, nur lesbar. */
-body.light-theme .st {
+body.light-theme .st, body.light-theme .std {
   --st-up: #2f9c63;
   --st-down: #c8431f;
   --st-pending: #b57c0a;
@@ -1153,6 +1157,11 @@ body.light-theme .st {
   background: var(--panel2); border: 1px solid var(--card-border);
   border-left: 3px solid var(--st-up);
 }
+/* Die Kachel laesst sich antippen -- sie bekommt deshalb eine Rueckmeldung. Auf der Wand
+   gibt es keinen Mauszeiger (body.wandanzeige), also ist das Aufleuchten beim Druecken das
+   einzige, was bestaetigt, dass die Beruehrung angekommen ist. */
+.st-kachel { cursor: pointer; transition: background 120ms ease; }
+.st-kachel:active { background: color-mix(in srgb, var(--text) 10%, var(--panel2)); }
 .st-kachel.st-up { border-left-color: var(--st-up); }
 .st-kachel.st-down { border-left-color: var(--st-down); }
 .st-kachel.st-pending { border-left-color: var(--st-pending); }
@@ -1189,6 +1198,61 @@ body.light-theme .st {
   align-items: center; text-align: center; gap: 1.2vh; padding: 0 10vw; }
 .st-leer-titel { font-size: 3.4vh; font-weight: 300; }
 .st-leer-text { font-size: 1.9vh; color: var(--muted); max-width: 60ch; line-height: 1.45; }
+
+/* --- Was hinter einer Kachel steckt ------------------------------------------------------
+   Angetippt zeigt eine Kachel, wie es dem Dienst in den letzten Stunden ergangen ist. Das
+   laeuft im selben Fenster wie die Kartendetails (.dt-*) -- samt 30-Sekunden-Uhr, Escape und
+   Tippen daneben. Ein zweites Fenster waere ein zweiter Satz Fluchtwege. */
+.std { display: flex; flex-direction: column; gap: 2vh; }
+.std-kopf { display: flex; align-items: center; gap: 1.6vh; flex-wrap: wrap; }
+.std-name { font-size: 4.4vh; font-weight: 300; line-height: 1.1; letter-spacing: -0.02em; }
+.std-chip { font-size: 1.6vh; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  padding: 0.5vh 1.4vh; border-radius: 999px; white-space: nowrap;
+  color: var(--st-up); border: 2px solid color-mix(in srgb, var(--st-up) 55%, transparent);
+  background: color-mix(in srgb, var(--st-up) 12%, transparent); }
+.std-chip.st-down { color: var(--st-down); border-color: color-mix(in srgb, var(--st-down) 55%, transparent);
+  background: color-mix(in srgb, var(--st-down) 14%, transparent); }
+.std-chip.st-pending { color: var(--st-pending); border-color: color-mix(in srgb, var(--st-pending) 55%, transparent);
+  background: color-mix(in srgb, var(--st-pending) 14%, transparent); }
+.std-chip.st-wartung { color: var(--st-wartung); border-color: color-mix(in srgb, var(--st-wartung) 55%, transparent);
+  background: color-mix(in srgb, var(--st-wartung) 14%, transparent); }
+
+.std-abschnitt { display: flex; flex-direction: column; gap: 0.8vh; }
+.std-titel { font-size: 1.4vh; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+/* Der Balken. Jedes Feld ist ein ZEITABSCHNITT, keine einzelne Pruefung -- Home Assistant
+   speichert nur die Aenderungen eines Zustands. Deshalb steht "Letzte 24 Stunden" darueber
+   und nicht "letzte 20 Pruefungen": Ein Balken, der etwas anderes zaehlt, als seine
+   Beschriftung sagt, ist schlimmer als keiner.
+   `flex: 1` auf jedem Feld statt einer gerechneten Breite: So bleibt der Balken bei 48 wie
+   bei 96 Feldern genau so breit wie das Fenster, ohne eine zweite Zahl im Code. */
+.std-balken { display: flex; gap: 0.3vh; height: 5.4vh; }
+.std-feld { flex: 1; min-width: 0; border-radius: 3px; background: var(--st-up); }
+.std-feld.st-down { background: var(--st-down); }
+.std-feld.st-pending { background: var(--st-pending); }
+.std-feld.st-wartung { background: var(--st-wartung); }
+/* Nichts bekannt ist NICHT "erreichbar". Ein gruenes Feld fuer einen Zeitraum, aus dem kein
+   Verlauf vorliegt, waere eine Behauptung ueber etwas, das niemand gemessen hat. */
+.std-feld.std-leer { background: color-mix(in srgb, var(--text) 10%, transparent); }
+.std-achse { display: flex; justify-content: space-between; font-size: 1.3vh; color: var(--muted); }
+.std-hinweis { font-size: 1.5vh; color: var(--muted); }
+
+/* Die Kurve ist hier NIEDRIGER als im Detailfenster einer Karte. Dort ist sie der Inhalt,
+   hier steht sie zwischen Balken, Kennzahlen und Ereignissen -- und das Fenster hat eine
+   feste Hoehe. Mit 26vh ragten die letzten Zeilen darunter heraus; auf einem Wandpanel
+   scrollt niemand, und was man nicht sieht, ist so gut wie nicht da. Nachgemessen in der
+   Probe (`scrollHeight` gegen `clientHeight`), nicht geschaetzt. */
+.std .dt-verlauf { height: 19vh; }
+
+.std-ereignisse { display: flex; flex-direction: column; }
+.std-ereignis { display: flex; align-items: center; gap: 1.2vh; padding: 1vh 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 8%, transparent); font-size: 1.9vh; }
+.std-ereignis:last-child { border-bottom: none; }
+/* Derselbe Punkt wie auf den Kacheln -- er hat dort schon eine Groesse in cqmin, die hier
+   ohne Container ins Leere liefe. */
+.std-ereignis .st-punkt { width: 1.2vh; height: 1.2vh; max-width: none; max-height: none; }
+.std-ereignis-text { flex: 1; min-width: 0; }
+.std-ereignis-zeit { color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Wie auf einem Tracker-Dashboard: Der Streifen unten darf sich die Hoehe nicht mit der
    Statusflaeche teilen, sonst steht eine bildschirmhohe Uhr ueber den Kacheln. */

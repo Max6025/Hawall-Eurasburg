@@ -3948,6 +3948,10 @@
       const gerundet = zahl(ms);
       raus.push({
         entity_id: s.entity_id,
+        // Die Kennung der Antwortzeit reist mit: Das Fenster hinter der Kachel holt davon den
+        // Verlauf, und sie hier noch einmal zu suchen hiesse, die Geschwister-Suche ein
+        // zweites Mal zu schreiben.
+        msId: ms ? ms.entity_id : '',
         name: statusName(s),
         zustand: String(s.state),
         ms: gerundet === null ? null : Math.round(gerundet),
@@ -4106,7 +4110,7 @@
     const kacheln = monitore.length ? `
       <div class="st-raster" style="--st-spalten:${raster.spalten};--st-zeilen:${raster.zeilen}">
         ${monitore.map(m => `
-          <div class="st-kachel ${STATUS_ZUSTAENDE[m.zustand].klasse}">
+          <div class="st-kachel ${STATUS_ZUSTAENDE[m.zustand].klasse}" data-entity="${esc(m.entity_id)}">
             <span class="st-punkt" aria-hidden="true"></span>
             <span class="st-name">${esc(m.name)}</span>
             <span class="st-werte">${esc(zahl(m.ms, ' ms', 0))}${
@@ -4116,6 +4120,157 @@
       </div>` : '';
 
     return `<div class="st">${kopf}${stoerungen}${kacheln}</div>`;
+  }
+
+  // --- Was hinter einer Kachel steckt -----------------------------------------------------
+  //
+  // Angetippt zeigt eine Kachel, wie es diesem Dienst in den letzten Stunden ergangen ist.
+  // Vorbild war die Statusseite von Uptime Kuma: ein Balken aus vielen kleinen Feldern, dazu
+  // Verfuegbarkeit, Antwortzeit und die letzten Ereignisse.
+  //
+  // EIN Unterschied dazu ist wichtig genug fuer einen eigenen Absatz: Dort ist jedes Feld
+  // EINE Pruefung. Diese Reihe gibt es hier nicht -- Home Assistant speichert nur die
+  // AENDERUNGEN eines Zustands, nicht jeden einzelnen Ping. Der Balken hier teilt deshalb die
+  // Zeit in gleich lange Abschnitte und faerbt jeden nach dem SCHLECHTESTEN Zustand darin.
+  // Das ist etwas anderes, und es steht auch so dran ("Letzte 24 Stunden", nicht "letzte 20
+  // Pruefungen"): Ein Balken, der etwas anderes zaehlt, als seine Beschriftung sagt, ist
+  // schlimmer als keiner. Der Vorteil wiegt es auf -- ein Ausfall von drei Minuten faerbt
+  // seinen Abschnitt, egal wie oft dazwischen geprueft wurde.
+
+  const STATUS_BALKEN_FELDER = 48;     // 48 Felder auf 24 Stunden = eine halbe Stunde je Feld
+
+  /**
+   * Einen Zustandsverlauf in Abschnitte schneiden.
+   *
+   * Rein: die Punkte aus Home Assistant (`[{ ms, zustand }]`, aufsteigend) und der Zeitraum.
+   * Raus: ein Feld je Abschnitt mit `zustand` ('' = nichts bekannt).
+   *
+   * Reine Funktion, und das ist hier kein Selbstzweck: Ob der Balken einen kurzen Ausfall
+   * zeigt oder verschluckt, laesst sich sonst nur beobachten, indem man einen herbeifuehrt.
+   */
+  function statusBalken(punkte, vonMs, bisMs, felder) {
+    const n = Math.max(1, Math.round(Number(felder) || STATUS_BALKEN_FELDER));
+    const von = Number(vonMs), bis = Number(bisMs);
+    if (!Number.isFinite(von) || !Number.isFinite(bis) || bis <= von) return [];
+    const breite = (bis - von) / n;
+
+    // Aus den Punkten werden Strecken: Ein Zustand gilt, bis der naechste gemeldet wird.
+    const sauber = (punkte || [])
+      .map(p => ({ ms: detailMs(p && p.ms !== undefined ? p.ms : (p || {}).t), zustand: String((p || {}).zustand || '') }))
+      .filter(p => Number.isFinite(p.ms) && p.zustand)
+      .sort((a, b) => a.ms - b.ms);
+    const strecken = sauber.map((p, i) => ({
+      von: p.ms, bis: i + 1 < sauber.length ? sauber[i + 1].ms : bis, zustand: p.zustand
+    }));
+
+    const raus = [];
+    for (let i = 0; i < n; i++) {
+      const a = von + i * breite, b = a + breite;
+      let schlechtester = '';
+      for (const s of strecken) {
+        if (s.bis <= a || s.von >= b) continue;
+        if (!STATUS_ZUSTAENDE[s.zustand]) continue;
+        if (!schlechtester
+          || STATUS_ZUSTAENDE[s.zustand].rang < STATUS_ZUSTAENDE[schlechtester].rang) {
+          schlechtester = s.zustand;
+        }
+      }
+      raus.push({ von: a, bis: b, zustand: schlechtester });
+    }
+    return raus;
+  }
+
+  /**
+   * Die Wechsel im Verlauf, neueste zuerst.
+   *
+   * Nur die WECHSEL: Home Assistant meldet denselben Zustand auch dann noch einmal, wenn sich
+   * nur ein Attribut geruehrt hat (bei einem Monitor die Antwortzeit, also staendig). Eine
+   * Liste aus zweihundert Zeilen "Erreichbar" beantwortet keine Frage.
+   */
+  function statusEreignisse(punkte, hoechstens) {
+    const sauber = (punkte || [])
+      .map(p => ({ ms: detailMs(p && p.ms !== undefined ? p.ms : (p || {}).t), zustand: String((p || {}).zustand || '') }))
+      .filter(p => Number.isFinite(p.ms) && STATUS_ZUSTAENDE[p.zustand])
+      .sort((a, b) => a.ms - b.ms);
+    const wechsel = sauber.filter((p, i) => i === 0 || p.zustand !== sauber[i - 1].zustand);
+    wechsel.reverse();
+    return wechsel.slice(0, Math.max(1, Math.round(Number(hoechstens) || 6)));
+  }
+
+  /**
+   * Das Fenster hinter einer Kachel.
+   *
+   * Erwartet: { monitor, zustandsVerlauf, msVerlauf, stunden, jetzt }
+   *   monitor         -- ein Eintrag aus statusMonitore()
+   *   zustandsVerlauf -- [{ t|ms, zustand }] der Statusentitaet
+   *   msVerlauf       -- [{ t, v }] der Antwortzeit, fuer die Kurve
+   */
+  function statusDetail(d) {
+    const m = (d && d.monitor) || {};
+    const jetzt = Number(d && d.jetzt) || Date.now();
+    const stunden = Number(d && d.stunden) > 0 ? Number(d.stunden) : 24;
+    const von = jetzt - stunden * 3600000;
+    const zustand = STATUS_ZUSTAENDE[m.zustand] || null;
+
+    const felder = statusBalken(d && d.zustandsVerlauf, von, jetzt, STATUS_BALKEN_FELDER);
+    // VIER, nicht sechs. Das Fenster hat eine feste Hoehe, und mit sechs Zeilen ragte die
+    // letzte darunter heraus -- auf einem Wandpanel scrollt niemand, und was man nicht sieht,
+    // ist so gut wie nicht da. Vier Wechsel beantworten die Frage, mit der man das Fenster
+    // oeffnet: Ist das gerade erst passiert, oder wackelt das schon den ganzen Tag?
+    const ereignisse = statusEreignisse(d && d.zustandsVerlauf, 4);
+
+    const kopf = `
+      <div class="std-kopf">
+        <div class="std-name">${esc(m.name || '')}</div>
+        <div class="std-chip ${zustand ? zustand.klasse : ''}">${esc(zustand ? zustand.text : 'Unbekannt')}</div>
+      </div>`;
+
+    // Kein einziges gefaerbtes Feld heisst: Home Assistant hat fuer diesen Zeitraum nichts.
+    // Ein durchgehend grauer Balken ohne ein Wort dazu saehe aus wie ein Ausfall.
+    const etwasBekannt = felder.some(f => f.zustand);
+    const balken = `
+      <div class="std-abschnitt">
+        <div class="std-titel">Letzte ${esc(stunden)} Stunden</div>
+        <div class="std-balken" aria-hidden="true">
+          ${felder.map(f => `<span class="std-feld ${f.zustand ? STATUS_ZUSTAENDE[f.zustand].klasse : 'std-leer'}"></span>`).join('')}
+        </div>
+        <div class="std-achse"><span>vor ${esc(stunden)} Std.</span><span>jetzt</span></div>
+        ${etwasBekannt ? '' : '<div class="std-hinweis">Für diesen Zeitraum liegt kein Verlauf vor.</div>'}
+      </div>`;
+
+    const zahl = (v, einheit, stellen) => (v === null || !Number.isFinite(v)) ? '–'
+      : v.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen }) + einheit;
+    const kennzahlen = `
+      <div class="dt-kennzahlen">
+        <div><span>Antwortzeit</span><strong>${esc(zahl(m.ms, ' ms', 0))}</strong></div>
+        <div><span>Verfügbarkeit 30 Tage</span><strong>${esc(zahl(m.quote, ' %', 2))}</strong></div>
+        <div><span>Zuletzt geändert</span><strong>${esc(ereignisse.length ? detailZeit(new Date(ereignisse[0].ms).toISOString()) : '–')}</strong></div>
+      </div>`;
+
+    // Die Kurve der Antwortzeit baut `detailVerlaufSvg()` -- dieselbe mit Zeitachse und
+    // Tippstrich wie im Detailfenster einer Karte. Sie hier nachzubauen waere eine zweite
+    // Wahrheit, und die beiden waeren sich beim naechsten Umbau nicht mehr einig.
+    const kurve = detailVerlaufSvg(d && d.msVerlauf, 'ms', 0);
+    const verlauf = kurve ? `
+      <div class="std-abschnitt">
+        <div class="std-titel">Antwortzeit</div>
+        ${kurve}
+      </div>` : '';
+
+    const ereignisliste = ereignisse.length ? `
+      <div class="std-abschnitt">
+        <div class="std-titel">Ereignisse</div>
+        <div class="std-ereignisse">
+          ${ereignisse.map(e => `
+            <div class="std-ereignis ${STATUS_ZUSTAENDE[e.zustand].klasse}">
+              <span class="st-punkt" aria-hidden="true"></span>
+              <span class="std-ereignis-text">${esc(STATUS_ZUSTAENDE[e.zustand].text)}</span>
+              <span class="std-ereignis-zeit">${esc(detailZeit(new Date(e.ms).toISOString()))}</span>
+            </div>`).join('')}
+        </div>
+      </div>` : '';
+
+    return `<div class="std">${kopf}${balken}${kennzahlen}${verlauf}${ereignisliste}</div>`;
   }
 
   global.DashboardRender = {
@@ -4133,6 +4288,9 @@
     // Dadurch laesst sich pruefen, dass das Ausgefallene oben steht und dass die Zahl in der
     // Ueberschrift zur Liste darunter passt -- ohne Home Assistant und ohne Bildschirm.
     statusMonitore, statusProbleme, statusRaster, statusAnsicht, statusEntitaeten, STATUS_ZUSTAENDE,
+    // Was hinter einer Kachel steckt. `statusBalken` ist eine reine Funktion, weil sich sonst
+    // nur durch einen echten Ausfall pruefen laesst, ob ein kurzer darin sichtbar bleibt.
+    statusBalken, statusEreignisse, statusDetail, STATUS_BALKEN_FELDER,
     // Der Tippstrich im Verlauf: Welcher Punkt gemeint ist und wo er waagerecht liegt, sind
     // reine Funktionen. Nur so laesst sich pruefen, dass Strich und Punkt an derselben Stelle
     // sitzen, ohne einen Finger zu haben.

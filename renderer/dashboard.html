@@ -320,6 +320,12 @@ async function renderStatusView() {
   });
   // Dieselbe Rolle wie `kartenEntitaeten()` bei den Karten: Ohne das traegt der Filter der
   // Live-Verbindung noch das vorher gezeigte Dashboard.
+  // Die Kacheln sind anklickbar. Verdrahtet wird NACH dem Zeichnen und direkt am Element:
+  // Der Inhalt wird bei jedem Abruf neu gebaut, ein Zuhoerer von vorher haenge am alten.
+  for (const kachel of el.querySelectorAll('.st-kachel[data-entity]')) {
+    kachel.addEventListener('click', () => statusDetailOeffnen(kachel.dataset.entity));
+  }
+
   letzteAnzeigeEntitaeten = DashboardRender.statusEntitaeten(statesById);
   if (config && config.sunEntity) letzteAnzeigeEntitaeten.add(config.sunEntity);
   if (config && config.notifyEntity) letzteAnzeigeEntitaeten.add(config.notifyEntity);
@@ -523,6 +529,28 @@ async function ensureHistory(entityId, stunden) {
   if (historyCache[key]) return historyCache[key];
   try {
     const r = await fetch(`${API}/api/ha/history?entity_id=${encodeURIComponent(entityId)}&hours=${h}`);
+    const data = await r.json();
+    historyCache[key] = data.ok ? data.series : [];
+  } catch (e) {
+    historyCache[key] = [];
+  }
+  return historyCache[key];
+}
+
+/**
+ * Derselbe Verlauf, aber fuer Entitaeten, deren Zustand KEINE Zahl ist.
+ *
+ * Ein Uptime-Kuma-Monitor meldet "up"/"down"/"pending". `ensureHistory()` wirft solche Punkte
+ * weg (`parseFloat` -> NaN), und die Reihe kaeme leer zurueck -- von aussen nicht davon zu
+ * unterscheiden, dass Home Assistant keinen Verlauf hat. Derselbe Pfad, derselbe Speicher,
+ * nur ein anderes Feld.
+ */
+async function ensureZustandsverlauf(entityId, stunden) {
+  const h = Number(stunden) > 0 ? Number(stunden) : 24;
+  const key = entityId + '@' + h + '@text';
+  if (historyCache[key]) return historyCache[key];
+  try {
+    const r = await fetch(`${API}/api/ha/history?entity_id=${encodeURIComponent(entityId)}&hours=${h}&text=1`);
     const data = await r.json();
     historyCache[key] = data.ok ? data.series : [];
   } catch (e) {
@@ -1818,6 +1846,27 @@ function detailStrichZeichnen() {
   ziel.addEventListener('pointermove', (e) => { if (e.buttons || e.pressure > 0) fassen(e); });
 })();
 
+// Wie weit das Fenster hinter einer Kachel zurueckblickt. EINE Zahl, und sie gilt fuer
+// beide Abrufe: Ein Balken ueber 24 Stunden neben einer Kurve ueber sechs waere ein Fenster,
+// das zwei verschiedene Zeitraeume nebeneinanderstellt, ohne es zu sagen.
+const STATUS_DETAIL_STUNDEN = 24;
+
+/**
+ * Das Fenster hinter einer Statuskachel.
+ *
+ * Derselbe Rahmen wie bei den Kartendetails -- und das ist der Punkt: Die 30-Sekunden-Uhr,
+ * Escape, Tippen daneben und das Zumachen durch den Bildschirmschoner gibt es damit umsonst.
+ * Ein zweites Fenster waere ein zweiter Satz Fluchtwege, und einer davon wuerde vergessen.
+ */
+async function statusDetailOeffnen(entity_id) {
+  detailLaeuft = { art: 'status', entity_id, type: 'status', settings: {} };
+  const h = $('detailHuelle');
+  if (!h) return;
+  h.hidden = false;
+  await detailAktualisieren();
+  detailUhrStellen();
+}
+
 async function detailOeffnen(entity_id, type, settings) {
   detailLaeuft = { entity_id, type, settings: settings || {} };
   const h = $('detailHuelle');
@@ -1839,6 +1888,22 @@ async function detailAktualisieren() {
   const { entity_id, type, settings } = detailLaeuft;
   const ziel = $('detailInhalt');
   if (!ziel) return;
+
+  // Eine Statuskachel hat keine Karte und keine Einstellungen -- sie kommt aus den Zustaenden.
+  if (detailLaeuft.art === 'status') {
+    const monitor = DashboardRender.statusMonitore(statesById)
+      .find(m => m.entity_id === entity_id);
+    if (!monitor) { detailSchliessen(); return; }
+    const [zustandsVerlauf, msVerlauf] = await Promise.all([
+      ensureZustandsverlauf(entity_id, STATUS_DETAIL_STUNDEN),
+      monitor.msId ? ensureHistory(monitor.msId, STATUS_DETAIL_STUNDEN) : Promise.resolve([])
+    ]);
+    ziel.innerHTML = DashboardRender.statusDetail({
+      monitor, zustandsVerlauf, msVerlauf, stunden: STATUS_DETAIL_STUNDEN
+    });
+    detailStrichZeichnen();
+    return;
+  }
 
   const eintrag = { entity_id, settings };
   const zusatz = await kartenZusatz(eintrag, type);

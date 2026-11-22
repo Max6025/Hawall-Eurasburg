@@ -52,6 +52,14 @@
     <div class="status-view" id="statusView"></div>
     <div class="unterleiste" id="unterleiste"></div>
   </div></div>
+  <!-- Dasselbe Fenster wie in der Anzeige. Ohne das liesse sich hier nur der halbe Weg
+       ansehen: Die Kachel ist anklickbar, und was dann kommt, ist das Eigentliche. -->
+  <div class="dt-huelle" id="detailHuelle" hidden>
+    <div class="dt-fenster" id="detailFenster" role="dialog" aria-modal="true">
+      <button class="dt-zu" id="detailZuKnopf" aria-label="Schließen">✕</button>
+      <div class="dt-inhalt" id="detailInhalt"></div>
+    </div>
+  </div>
   <div class="marke" id="marke"></div>
 <script src="../../renderer/shared/dashboard-render.js"></script>
 <script>
@@ -146,7 +154,59 @@
       `Fall "${fall}" · ${m.length} Dienste · Raster ${raster.spalten}×${raster.zeilen}`
       + ` · Fläche ${Math.round(k.width)}×${Math.round(k.height)} px`
       + ` · ${ueber > 1 ? '⚠ ' + ueber + ' px zu hoch (scrollt!)' : 'passt'}`;
+    for (const kachel of el.querySelectorAll('.st-kachel[data-entity]')) {
+      kachel.addEventListener('click', () => kachelOeffnen(kachel.dataset.entity));
+    }
   }
+  // --- Das Fenster hinter einer Kachel ----------------------------------------------------
+  // Der Verlauf wird hier ERFUNDEN: ein paar Wechsel in den letzten 24 Stunden. Auf dem Gerät
+  // kommt er aus Home Assistant (`/api/ha/history?...&text=1`).
+  const JETZT = Date.now();
+  function verlaufFuer(name) {
+    const b = kennung(name);
+    const z = zustaende[b + '_status'];
+    const ende = z ? z.state : 'up';
+    // Ein kurzer Ausfall vor drei Stunden -- der Fall, an dem man sieht, ob ein Balkenfeld
+    // ihn trägt oder verschluckt.
+    return [
+      { t: new Date(JETZT - 24 * 3600000).toISOString(), zustand: 'up' },
+      { t: new Date(JETZT - 9 * 3600000).toISOString(), zustand: 'pending' },
+      { t: new Date(JETZT - 8.6 * 3600000).toISOString(), zustand: 'up' },
+      { t: new Date(JETZT - 3 * 3600000).toISOString(), zustand: 'down' },
+      { t: new Date(JETZT - 3 * 3600000 + 180000).toISOString(), zustand: ende }
+    ];
+  }
+  function msVerlaufFuer(i) {
+    return Array.from({ length: 70 }, (_, k) => ({
+      t: new Date(JETZT - (69 - k) * (24 * 3600000 / 69)).toISOString(),
+      v: 40 + Math.sin(k / 6 + i) * 18 + Math.sin(k / 2.3) * 5
+    }));
+  }
+  function kachelOeffnen(entityId) {
+    const m = DashboardRender.statusMonitore(zustaende).find(x => x.entity_id === entityId);
+    if (!m) return;
+    document.getElementById('detailInhalt').innerHTML = DashboardRender.statusDetail({
+      monitor: m, zustandsVerlauf: verlaufFuer(m.name),
+      msVerlauf: msVerlaufFuer(m.name.length), stunden: 24, jetzt: JETZT
+    });
+    document.getElementById('detailHuelle').hidden = false;
+    // Derselbe Tippstrich wie in der Anzeige -- die Kurve ist dieselbe Funktion.
+    const box = document.querySelector('#detailInhalt .dt-verlauf-box');
+    if (box) {
+      const ziel = document.getElementById('detailInhalt');
+      ziel.onpointerdown = (e) => {
+        const b = e.target.closest && e.target.closest('.dt-verlauf-box');
+        if (!b) return;
+        const a = DashboardRender.verlaufStrichAnteil(b, e.clientX);
+        if (a !== null) DashboardRender.verlaufStrichZeichnen(b, a);
+      };
+    }
+  }
+  document.getElementById('detailZuKnopf').addEventListener('click',
+    () => { document.getElementById('detailHuelle').hidden = true; });
+  document.getElementById('detailHuelle').addEventListener('click',
+    (e) => { if (e.target.id === 'detailHuelle') document.getElementById('detailHuelle').hidden = true; });
+
   // Erst nach den Schriften messen: Vorher sind die Kästen noch nicht in ihrer Endgröße --
   // dieselbe Falle wie in .scratch/detailfenster (dort kam "Fenster 2×2 px" heraus).
   document.fonts.ready.then(() => requestAnimationFrame(() => requestAnimationFrame(zeichnen)));

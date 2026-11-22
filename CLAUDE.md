@@ -680,6 +680,43 @@ sehen ist, gehört dagegen ausdrücklich **nicht** hierher — das ist Sache des
   Ansehen: `.scratch/statusseite/probe.html` — `?fall=viele` (60 Dienste), `?fall=leer`,
   `?hell`, `?weit`. Die Probe **misst nach**, ob es wirklich auf einen Bildschirm passt
   (`scrollHeight` gegen `clientHeight`), statt es zu behaupten.
+- **Hinter einer Statuskachel steckt ein Balken — und jedes Feld ist ein ZEITABSCHNITT, keine
+  Prüfung.** Angetippt zeigt eine Kachel, wie es dem Dienst in den letzten 24 Stunden ergangen
+  ist: der Balken, Antwortzeit und Verfügbarkeit, die Kurve der Antwortzeit und die letzten
+  Wechsel. Vorbild war die Statusseite von Uptime Kuma. Der eine Unterschied dazu ist der
+  wichtigste Satz hier: **Dort ist jedes Feld eine einzelne Prüfung.** Die Reihe gibt es bei uns
+  nicht — Home Assistant speichert nur die *Änderungen* eines Zustands, nicht jeden Ping.
+  `statusBalken()` teilt deshalb die Zeit in gleich lange Abschnitte und färbt jeden nach dem
+  **schlechtesten** Zustand darin. Das steht auch so dran („Letzte 24 Stunden", nicht „letzte 20
+  Prüfungen"): Ein Balken, der etwas anderes zählt, als seine Beschriftung sagt, ist schlimmer
+  als keiner. Der Tausch lohnt sich — ein Ausfall von drei Minuten färbt sein Feld, egal wie oft
+  dazwischen geprüft wurde; zwischen zwei Prüfungen wäre er verschwunden. Fünf Punkte:
+  1. **Nichts bekannt ist NICHT „erreichbar".** Ein graues Feld, und bei durchgehend grauem
+     Balken ein Satz dazu. Ein grünes Feld für einen Zeitraum, aus dem kein Verlauf vorliegt,
+     wäre eine Behauptung über etwas, das niemand gemessen hat.
+  2. **Der Zustandsverlauf geht über DIESELBE Route** wie der Zahlenverlauf, nur mit `text=1`.
+     `parseFloat('up')` ist NaN — ohne diesen Zweig kam die Reihe leer zurück, und von außen war
+     das nicht davon zu unterscheiden, dass Home Assistant keinen Verlauf hat. Zwei Routen für
+     denselben Abruf liefen beim nächsten Umbau auseinander.
+  3. **Es ist DASSELBE Fenster wie bei den Kartendetails** (`detailLaeuft.art === 'status'`).
+     Damit gibt es die 30-Sekunden-Uhr, Escape, Tippen daneben und das Zumachen durch den
+     Bildschirmschoner umsonst. Ein zweites Fenster wäre ein zweiter Satz Fluchtwege, und einer
+     davon würde vergessen.
+  4. **Die Kurve baut `detailVerlaufSvg()`** — dieselbe mit Zeitachse und Tippstrich. Sie hier
+     nachzubauen wäre eine zweite Wahrheit. Sie ist nur **niedriger** (19vh statt 26vh): Dort ist
+     sie der Inhalt, hier steht sie zwischen Balken, Kennzahlen und Ereignissen. Mit 26vh ragten
+     die letzten Zeilen unter die feste Fensterhöhe — in der Probe nachgemessen
+     (`scrollHeight` gegen `clientHeight`), nicht geschätzt. Aus demselben Grund höchstens
+     **vier** Ereignisse.
+  5. **Die Ereignisliste zeigt nur Wechsel.** Home Assistant meldet denselben Zustand auch dann
+     noch einmal, wenn sich nur ein Attribut gerührt hat — bei einem Monitor die Antwortzeit,
+     also ständig. Zweihundert Zeilen „Erreichbar" beantworten keine Frage.
+
+  Beide Abrufe nehmen **denselben** Zeitraum (`STATUS_DETAIL_STUNDEN`): Ein Balken über 24
+  Stunden neben einer Kurve über sechs wäre ein Fenster, das zwei Zeiträume nebeneinanderstellt,
+  ohne es zu sagen. Die Probe (`.scratch/statusseite/probe.html`) hat das Fenster mit, samt
+  einem erfundenen Ausfall von drei Minuten vor drei Stunden — dem Fall, an dem man sieht, ob
+  ein Feld ihn trägt oder verschluckt.
 - **Karten brauchen mehr als ihren Zustand, und das steht an einer Stelle.** `kartenZusatz()`
   in `dashboard.html` holt Verlauf, Vorhersage, Mülltermine und Energiequellen. Zwei Flächen
   bauen Karten — das Dashboard und der Bildschirmschoner —, und die zweite Fläche holte in
@@ -1375,7 +1412,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-641 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+654 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 
