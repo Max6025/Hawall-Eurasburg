@@ -744,6 +744,27 @@ sehen ist, gehört dagegen ausdrücklich **nicht** hierher — das ist Sache des
   Prüfen mit `.scratch/karten-design/ort-probe.html?weit` — die Frage ist
   nicht, ob es gut aussieht, sondern ob man es aus der Entfernung erkennt. `?ohne` zeigt
   zum Vergleich, wie es vorher war.
+- **Das Kartensymbol darf groß und blass in den Hintergrund** (`symbolHintergrund`), dieselbe
+  Fläche, die sonst das Ortszeichen benutzt. Anlass war die Wasseruhr: Drei Karten mit Litern
+  und Kubikmetern sehen aus wie drei beliebige Zahlen — mit einem Tropfen dahinter erkennt man
+  aus der Entfernung an der **Form**, worum es geht, bevor man die Zahl liest. Vier Punkte:
+  1. **Der ORT gewinnt.** Er sagt *wo* gemessen wird, das Symbol nur *was*; beides übereinander
+     wären zwei blasse Zeichnungen an derselben Stelle — aus fünf Metern ein Fleck.
+  2. **Gezeichnet wird DASSELBE Symbol wie oben links**, gemerkt in `benutztesSymbol`. Jeder
+     Kartenzweig reicht seinen eigenen Standard herein; die Reihenfolge „eigene Wahl >
+     HA-Symbol > Typ > Domäne“ am Ende noch einmal nachzubauen hieße, sie ein zweites Mal zu
+     schreiben — und beim nächsten Kartentyp liefe sie auseinander.
+  3. **Angeboten nur bei `SYMBOL_HG_TYPEN`** (dieselbe Liste wie der Ort). Auf einer Lampen-
+     oder Tor-Karte liegen unter dem Wert Bedienelemente, und die Zeichnung läge darunter
+     durch. Die Liste steht im Renderer, nicht im Editor: Zwei Listen wären eine Einstellung,
+     die angeboten wird und nichts tut.
+  4. **Ab Werk aus**, anders als beim Ort. Eingeschaltet würde sie jede bestehende Messkarte
+     stillschweigend ändern — und neue Standardwerte ändern bestehende Anzeigen.
+
+  Das eingebaute Zeichen ist ein **Strich**, das aus Home Assistant eine **Fläche**: Ein Strich
+  von zwei Einheiten im 24er-Raster wird auf Kartenhöhe gezogen zum Balken, deshalb dünner im
+  CSS. Beide Fälle stehen in `.scratch/karten-design/vorschau.html` (`wasser.*`), samt dem
+  Konflikt mit dem Ort.
 - **Karten-Einstellungen leben an genau zwei Stellen.** `settingsFieldsForType()` in
   `editor.js` entscheidet, welche Felder ein Typ bekommt; `buildCard()` in
   `dashboard-render.js` liest sie. Wer eine Einstellung nur an einer der beiden Stellen
@@ -1341,7 +1362,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-627 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+635 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

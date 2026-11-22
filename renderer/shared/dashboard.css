@@ -413,14 +413,21 @@ body { background: var(--page-bg-image, none) center/cover fixed, var(--bg); }
 .card.ort-innen .row .icon, .card.ort-aussen .row .icon, .card.ort-treppenhaus .row .icon,
 .card.ort-wohnzimmer .row .icon { color: var(--text); opacity: 0.85; }
 
-.card .ort-silhouette {
+/* Zwei Quellen, dieselbe Flaeche: der ORT (Haus, Sonne, Treppe, Sofa) und -- wenn kein Ort
+   gilt -- das SYMBOL der Karte selbst. Deshalb eine Regel fuer beide: Zwei Kopien liefen beim
+   naechsten Verschieben auseinander, und der Unterschied faellt erst auf der Wand auf. */
+.card .ort-silhouette, .card .symbol-silhouette {
   position: absolute; z-index: 0; pointer-events: none;
   right: -4%; bottom: -8%;
   height: 92%; aspect-ratio: 1;
   color: var(--text); opacity: 0.075;
 }
-.card .ort-silhouette svg { width: 100%; height: 100%; display: block; }
-body.light-theme .card .ort-silhouette { opacity: 0.09; }
+.card .ort-silhouette svg, .card .symbol-silhouette svg { width: 100%; height: 100%; display: block; }
+body.light-theme .card .ort-silhouette, body.light-theme .card .symbol-silhouette { opacity: 0.09; }
+/* Die eingebauten Zeichen sind Striche, die Symbole aus Home Assistant Flaechen. Ein Strich
+   von zwei Einheiten wird hier auf Kartenhoehe gezogen und waere ein Balken -- deshalb duenner.
+   Eine Flaeche (MDI) bleibt unberuehrt, `stroke-width` wirkt auf sie nicht. */
+.card .symbol-silhouette svg { stroke-width: 1.1; }
 
 /* --- Die Bewegung der Ortszeichen -------------------------------------------------------------
    Je Ort EINE Bewegung, die zu seinem Zeichen gehoert (siehe ORTE in dashboard-render.js) --

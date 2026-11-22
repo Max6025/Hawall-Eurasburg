@@ -2226,6 +2226,19 @@
   // selbst auf jeder Windkarte erscheint, ist eine Aenderung, um die niemand gebeten hat.
   const ORT_TYPEN_WAHL = ORT_TYPEN.concat(['wind', 'rain', 'gauge']);
 
+  /**
+   * Wo sich das Kartensymbol als blasse Silhouette in den Hintergrund legen laesst.
+   *
+   * Dieselbe Liste wie beim Ort, und aus demselben Grund: Dort ist der Aufbau der Karte so,
+   * dass unter Wert und Name Flaeche frei bleibt. Auf einer Lampen- oder Tor-Karte liegen dort
+   * Bedienelemente, und die Zeichnung laege darunter durch.
+   *
+   * Die Liste steht hier und nicht im Editor -- `settingsFieldsForType()` fragt sie ab. Zwei
+   * Listen waeren eine Einstellung, die angeboten wird und nichts tut (siehe CLAUDE.md,
+   * gauge.baseColor).
+   */
+  const SYMBOL_HG_TYPEN = ORT_TYPEN_WAHL;
+
   // --- Hat es geklappt? ---------------------------------------------------------------------------
   //
   // Ein Torantrieb braucht Sekunden, bis sich etwas sichtbar tut, und ein Skript gibt ueberhaupt
@@ -2704,7 +2717,16 @@
     const ort = ORT_TYPEN.includes(type)
       ? ortErmitteln(settings, (settings.name && String(settings.name).trim()) || (opts.namen && opts.namen[entity_id]) || attrs.friendly_name, entity_id)
       : ((ORT_TYPEN_WAHL.includes(type) && ortGesetzt) ? settings.ort : '');
-    const ortSymbol = (standard) => (ort && !(settings && settings.icon)) ? ORTE[ort].symbol : symbolFuer(settings, standard);
+    // Welches Zeichen die Karte oben links WIRKLICH traegt. Gemerkt wird es, weil die
+    // Silhouette im Hintergrund dasselbe sein muss -- nicht ein aehnliches. Jeder Kartenzweig
+    // reicht seinen eigenen Standard herein; ihn am Ende noch einmal nachzubauen hiesse, die
+    // Reihenfolge "eigene Wahl > HA-Symbol > Typ > Domaene" ein zweites Mal zu schreiben.
+    let benutztesSymbol = '';
+    const ortSymbol = (standard) => {
+      const s = (ort && !(settings && settings.icon)) ? ORTE[ort].symbol : symbolFuer(settings, standard);
+      benutztesSymbol = s;
+      return s;
+    };
     const ortChip = ort ? `<span class="ort-chip">${ORTE[ort].text}</span>` : '';
 
     if (type === 'climate') {
@@ -3493,6 +3515,17 @@
 
     // Die Silhouette als letztes Kind VOR allen anderen: Sie liegt unter Zahl und Schrift
     // (z-index in dashboard.css) und darf von keinem Zweig oben ueberschrieben werden.
+    //
+    // Zwei Quellen, und der ORT gewinnt: Er sagt WO gemessen wird, das Symbol nur WAS. Beides
+    // uebereinander waeren zwei blasse Zeichnungen an derselben Stelle -- aus fuenf Metern ein
+    // Fleck, aus naechster Naehe ein Fehler.
+    if (!ort && settings.symbolHintergrund && benutztesSymbol && SYMBOL_HG_TYPEN.includes(type)) {
+      const umriss = document.createElement('div');
+      umriss.className = 'symbol-silhouette';
+      umriss.setAttribute('aria-hidden', 'true');
+      umriss.innerHTML = benutztesSymbol;
+      card.insertBefore(umriss, card.firstChild);
+    }
     if (ort) {
       card.classList.add('ort-' + ort);
       const umriss = document.createElement('div');
@@ -4062,7 +4095,7 @@
     domainsForType, typesForEntity, renderClockNow, sensorAkzente, SENSOR_FARBEN, SENSOR_FARBEN_HELL, isSolar,
     mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil, verlaufGlaetten, trackerAkku, trackerAkkuHtml, trackerSpur,
     sensornameDeutsch, SENSORNAMEN,
-    ORT_TYPEN_WAHL,
+    ORT_TYPEN_WAHL, SYMBOL_HG_TYPEN,
     DETAIL_TYPEN,
     verlaufStunden,
     detailInhalt,

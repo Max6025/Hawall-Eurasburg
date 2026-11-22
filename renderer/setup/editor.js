@@ -609,6 +609,9 @@ function settingsFieldsForType(type) {
     // Innen/aussen nur dort, wo dieselbe Messgroesse an beiden Orten vorkommt -- die Liste
     // steht im Renderer, damit Editor und Karte nicht auseinanderlaufen.
     ortWahl: DashboardRender.ORT_TYPEN_WAHL.includes(type),
+    // Die Liste steht im Renderer, nicht hier: Eine zweite Liste waere eine Einstellung, die
+    // angeboten wird und nichts tut (siehe CLAUDE.md, gauge.baseColor).
+    symbolHintergrund: DashboardRender.SYMBOL_HG_TYPEN.includes(type),
     verlaufOpts: mitZahl.includes(type) && type !== 'graph' && type !== 'gauge',
     iconWahl: !ohneSymbol.includes(type),
     radarOpts: type === 'radar',
@@ -702,6 +705,19 @@ function openSettings(entityId) {
   if (fields.suffix) {
     html += `<label>Einheit / Suffix (leer = automatisch${attrs.unit_of_measurement ? ': ' + attrs.unit_of_measurement : ''})</label>
       <input type="text" id="setSuffix" value="${settings.suffix || ''}" placeholder="${attrs.unit_of_measurement || ''}">`;
+  }
+  if (fields.symbolHintergrund) {
+    html += `<label style="display:flex; align-items:center; gap:0.6vh; margin-top:1vh;">
+        <input type="checkbox" id="setSymbolHg" ${settings.symbolHintergrund ? 'checked' : ''}
+          style="width:auto; margin:0;">
+        Symbol groß und blass in den Hintergrund
+      </label>
+      <p style="font-size:1.1vh; color:var(--muted); margin:0.4vh 0 1vh;">
+        Dasselbe Zeichen wie oben links, über die ganze Karte und kaum sichtbar. Aus der
+        Entfernung erkennt man dann an der <strong>Form</strong>, worum es geht, bevor man die
+        Zahl liest – ein Tropfen beim Wasser, eine Wolke beim Regen. Ist oben ein
+        <strong>Ort</strong> gesetzt oder erkannt, gewinnt dessen Zeichen: Es sagt
+        <em>wo</em> gemessen wird, das Symbol nur <em>was</em>.</p>`;
   }
   if (fields.ortWahl) {
     const w = settings.ort || '';
@@ -1497,6 +1513,12 @@ $('settingsSave').addEventListener('click', () => {
   if (settingsFields.suffix) {
     const v = ($('setSuffix') && $('setSuffix').value.trim()) || '';
     if (v) settings.suffix = v; else delete settings.suffix;
+  }
+  if (settingsFields.symbolHintergrund) {
+    // Gespeichert wird nur das Einschalten: Ein `false` in jeder Karte waere Ballast in der
+    // Konfiguration und saehe aus wie eine Entscheidung, die jemand getroffen hat.
+    if ($('setSymbolHg') && $('setSymbolHg').checked) settings.symbolHintergrund = true;
+    else delete settings.symbolHintergrund;
   }
   if (settingsFields.ortWahl) {
     // Leer heisst "automatisch" und wird NICHT gespeichert: Nur so bekommt eine Karte, die nie

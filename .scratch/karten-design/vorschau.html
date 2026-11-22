@@ -70,6 +70,19 @@ const KARTEN = [
   ['fan.schlafzimmer',    'fan',         Z('on',   { friendly_name: 'Ventilator', percentage: 40, percentage_step: 10 }), 1, 1],
   ['lock.haustuer',       'lock',        Z('locked', { friendly_name: 'Haustür' }), 1, 1],
   ['sensor.zaehler',      'sensor',      Z('4231.7', { friendly_name: 'Zählerstand', unit_of_measurement: 'kWh' }), 1, 1],
+  // Die Wasseruhr: drei Karten, die ihr Symbol gross und blass im Hintergrund tragen. Ohne
+  // diese Faelle hier bliebe ungeprueft, ob ein Strich-Symbol (eingebaut) und ein
+  // Flaechen-Symbol (aus Home Assistant) als Silhouette beide taugen -- das eine wird zum
+  // Balken, wenn man es auf Kartenhoehe zieht.
+  ['wasser.stand',   'sensor', Z('468.26', { friendly_name: 'Zählerstand', unit_of_measurement: 'm³', icon: 'mdi:gauge' }), 1, 1],
+  ['wasser.jetzt',   'sensor', Z('0.0',    { friendly_name: 'Verbrauch aktuell', unit_of_measurement: 'L', icon: 'mdi:water' }), 1, 1],
+  ['wasser.heute',   'sensor', Z('78.30',  { friendly_name: 'Verbrauch heute', unit_of_measurement: 'L', icon: 'mdi:water-plus' }), 1, 1],
+  ['wasser.breit',   'sensor', Z('78.30',  { friendly_name: 'Verbrauch heute', unit_of_measurement: 'L', icon: 'mdi:water-plus' }), 2, 1],
+  // Dasselbe ohne eigenes HA-Symbol: Dann ist es das eingebaute Strich-Zeichen.
+  ['wasser.strich',  'sensor', Z('12.4',   { friendly_name: 'Ohne HA-Symbol', unit_of_measurement: 'L' }), 1, 1],
+  // Und der Konflikt: Steht ein ORT fest, gewinnt dessen Zeichen -- zwei blasse Zeichnungen
+  // uebereinander waeren aus fuenf Metern ein Fleck.
+  ['wasser.mitOrt',  'temperature', Z('6.2', { friendly_name: 'Keller', unit_of_measurement: '°C', icon: 'mdi:water' }), 1, 1],
   ['alarm_control_panel.a', 'alarm',      Z('disarmed', { friendly_name: 'Alarmanlage', supported_features: 7 }), 1, 1],
   ['alarm_control_panel.b', 'alarm',      Z('armed_away', { friendly_name: 'Alarmanlage', supported_features: 7 }), 1, 1],
   ['alarm_control_panel.c', 'alarm',      Z('pending', { friendly_name: 'Alarmanlage', supported_features: 7 }), 1, 1],
@@ -158,7 +171,8 @@ const nur = new URLSearchParams(location.search).get('nur');
     energy: ENERGIE[id],
     // Gemessene Fahrzeit fuer die kalibrierten Tore -- 18 Sekunden auf.
     torZeiten: id.startsWith('cover.tor_') && id !== 'cover.tor_zu' ? { oeffnen: 18, schliessen: 20 } : undefined,
-    settings: id.startsWith('clock.marker') ? { clockFont: 'marker' }
+    settings: id.startsWith('wasser.') ? { symbolHintergrund: true }
+      : id.startsWith('clock.marker') ? { clockFont: 'marker' }
       : id === 'cover.tor_dau' ? { torDaueraufEntity: 'light.dauerauf' }
       : typ === 'navigate' ? { targetDashboardId: 'db_1', targetDashboardName: id === 'nav.bad' ? 'Badezimmer' : 'Küche' }
       : typ === 'gate' ? { gateButtons: [
