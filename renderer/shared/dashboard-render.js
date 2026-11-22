@@ -940,11 +940,41 @@
     return '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="' + d + '"/></svg>';
   }
 
+  /**
+   * Welches Symbol Home Assistant fuer diese Entitaet meint -- als NAME ("mdi:water").
+   *
+   * Zwei Quellen, und die zweite ist der Grund, warum es diese Funktion gibt: `attributes.icon`
+   * steht nur dort, wo jemand ein Symbol AUSDRUECKLICH gesetzt hat. Alles andere leitet die
+   * Oberflaeche von Home Assistant aus der GERAETEKLASSE ab, und zwar bei sich im Browser --
+   * ueber die Zustands-Schnittstelle kommt es nie mit.
+   *
+   * Am Geraet sah das so aus: Der Wasserzaehler zeigt in Home Assistant einen Tropfen, auf
+   * der Karte stand das allgemeine Sensorzeichen. Nichts war kaputt; das Attribut gab es
+   * schlicht nicht, und wir haben nur dort nachgesehen.
+   */
+  const GERAETEKLASSE_SYMBOL = {
+    water: 'water', gas: 'meter-gas', energy: 'lightning-bolt', power: 'flash',
+    temperature: 'thermometer', humidity: 'water-percent', moisture: 'water-percent',
+    pressure: 'gauge', atmospheric_pressure: 'gauge', battery: 'battery',
+    voltage: 'sine-wave', current: 'current-ac', frequency: 'sine-wave',
+    carbon_dioxide: 'molecule-co2', pm25: 'molecule', pm10: 'molecule',
+    signal_strength: 'wifi', timestamp: 'clock-outline', duration: 'progress-clock',
+    data_size: 'database', speed: 'speedometer', precipitation: 'weather-rainy',
+    precipitation_intensity: 'weather-rainy', wind_speed: 'weather-windy',
+    monetary: 'cash', volume: 'car-coolant-level', volume_storage: 'car-coolant-level',
+    volume_flow_rate: 'pipe'
+  };
+
+  function haSymbolName(attrs) {
+    const a = attrs || {};
+    return a.icon || GERAETEKLASSE_SYMBOL[a.device_class] || '';
+  }
+
   /** Braucht diese Karte ein Symbol aus Home Assistant? (Fuer das Nachladen der Pfade.) */
   function brauchtMdi(type, state, settings) {
     if (type !== 'sensor') return false;
     if (settings && settings.icon) return false;    // eigene Wahl schlaegt alles
-    return !!(state && state.attributes && state.attributes.icon);
+    return !!(state && haSymbolName(state.attributes));
   }
 
   // --- Schnellzugriff ---------------------------------------------------------------------------
@@ -3508,7 +3538,7 @@
       const unit = (settings.suffix !== undefined && settings.suffix !== '') ? settings.suffix : attrs.unit_of_measurement;
       card.innerHTML = `
         ${verlaufTeil}
-        <div class="row"><span class="icon">${ortSymbol(mdiSymbol(attrs.icon) || ICONS[domain] || ICONS.sensor)}</span><span class="row-rechts">${tendenzTeil}${ortChip}</span></div>
+        <div class="row"><span class="icon">${ortSymbol(mdiSymbol(haSymbolName(attrs)) || ICONS[domain] || ICONS.sensor)}</span><span class="row-rechts">${tendenzTeil}${ortChip}</span></div>
         <div class="value">${fmt(zahlFormatieren(val, settings.decimals), unit)}</div>
         <div class="name">${name}</div>`;
     }
@@ -4093,7 +4123,7 @@
     defaultCardType, allowedCardTypes, defaultSize, buildCard,
     sizeToSpan, minSpanFor, clampSpan, resolveSpan, schonerSpanne, SCHONER_SPALTEN, SCHONER_ZEILEN, thresholdColor,
     domainsForType, typesForEntity, renderClockNow, sensorAkzente, SENSOR_FARBEN, SENSOR_FARBEN_HELL, isSolar,
-    mdiSymbol, brauchtMdi, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil, verlaufGlaetten, trackerAkku, trackerAkkuHtml, trackerSpur,
+    mdiSymbol, brauchtMdi, haSymbolName, GERAETEKLASSE_SYMBOL, HINTERGRUND_WOLKEN, wolkenCss, wolkenMalen, ortErmitteln, ORT_TYPEN, ORTE, ortPhasenStil, verlaufGlaetten, trackerAkku, trackerAkkuHtml, trackerSpur,
     sensornameDeutsch, SENSORNAMEN,
     ORT_TYPEN_WAHL, SYMBOL_HG_TYPEN,
     DETAIL_TYPEN,

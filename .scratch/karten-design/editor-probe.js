@@ -29,10 +29,21 @@ const ZUSTAENDE = [
   ['sensor.solar', 'Ecowitt Sensor 11DC2 Solar Radiation', '412', { unit_of_measurement: 'W/m²', device_class: 'irradiance' }],
   ['sensor.text1', 'Betriebsart', 'Automatik', { icon: 'mdi:robot' }],
   ['sensor.text2', 'Letzter Abruf', 'vor 3 min', { icon: 'mdi:cloud-download' }],
-  ['sensor.text3', 'Zustand', 'bereit', {}]
+  ['sensor.text3', 'Zustand', 'bereit', {}],
+  // Die Wasseruhr. Diese drei sind der Fall, an dem aufgefallen ist, dass der Editor die
+  // Symbole aus Home Assistant NIE geladen hat -- und dass `attributes.icon` bei den meisten
+  // Entitaeten gar nicht existiert: Das Zeichen leitet Home Assistant bei sich aus der
+  // GERAETEKLASSE ab, und das kommt ueber die Zustands-Schnittstelle nie mit.
+  ['sensor.wasserzaehler_value', 'Value', '468.26', { unit_of_measurement: 'm³', device_class: 'water' }],
+  ['sensor.wasserzaehler_litres_current', 'Verbrauch aktuell', '1.5', { unit_of_measurement: 'L', device_class: 'water' }],
+  ['sensor.wasserzaehler_litres_today', 'Verbrauch heute', '78.30', { unit_of_measurement: 'L', device_class: 'water' }]
 ];
 
 const LAYOUT = [
+  { entity_id: 'sensor.wasserzaehler_litres_current', card_type: 'sensor', x: 0, y: 4, cols: 1, rows: 1,
+    settings: { symbolHintergrund: true } },
+  { entity_id: 'sensor.wasserzaehler_litres_today', card_type: 'sensor', x: 1, y: 4, cols: 1, rows: 1,
+    settings: { symbolHintergrund: true } },
   { entity_id: 'input_button.alle_tore', card_type: 'gate', x: 0, y: 0, cols: 2, rows: 2,
     settings: { name: 'Tor Normal', gateButtons: [{ label: 'Tor öffnen', entity: 'input_button.alle_tore' }] } },
   { entity_id: 'input_boolean.tor_dauerhaft_offen', card_type: 'gate', x: 2, y: 0, cols: 2, rows: 2,

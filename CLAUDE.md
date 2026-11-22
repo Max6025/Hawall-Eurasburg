@@ -1127,6 +1127,19 @@ sehen ist, gehört dagegen ausdrücklich **nicht** hierher — das ist Sache des
   `/api/ha/namen`). Ohne Administratorrechte lehnt Home Assistant sie ab — dann bleibt es bei
   `friendly_name`, so wie vorher. Reihenfolge überall: eigener Name > Registrierungsname >
   `friendly_name` > Kennung.
+- **`attributes.icon` steht nur dort, wo jemand ein Symbol AUSDRÜCKLICH gesetzt hat.** Alles
+  andere leitet die Oberfläche von Home Assistant aus der **Geräteklasse** ab — und zwar bei
+  sich im Browser; über die Zustands-Schnittstelle kommt es nie mit. Am Gerät sah das so aus:
+  Der Wasserzähler zeigt in Home Assistant einen Tropfen, auf der Karte stand das allgemeine
+  Sensorzeichen. Nichts war kaputt; das Attribut gab es schlicht nicht, und wir haben nur dort
+  nachgesehen. `haSymbolName()` nimmt deshalb beide Quellen, `GERAETEKLASSE_SYMBOL` ist die
+  Tabelle dazu. Ein Test prüft **jeden** Namen darin gegen `mdi-pfade.js`: Ein Tippfehler gibt
+  keinen Fehler, sondern fällt still auf genau das Zeichen zurück, das die Tabelle beheben soll.
+- **Der Editor hat die Symbole NIE geladen.** `mdi-pfade.js` wird bei Bedarf nachgeholt — in
+  `renderer/dashboard.html` seit jeher, im Editor nicht. Eine Sensorkarte zeigte dort deshalb
+  immer das allgemeine Zeichen und auf der Wand das aus Home Assistant. Eine Vorschau, die
+  etwas anderes zeigt als das Ergebnis, ist schlimmer als keine — genau dafür gibt es sie.
+  Geladen wird **vor** der ersten Karte: Nachgeladen nützt dem schon gezeichneten Bild nichts.
 - **Symbole aus Home Assistant kommen nur als NAME** („mdi:weather-sunny"), nie als Zeichnung.
   Die Zeichnungen liegen in der **erzeugten** Datei `renderer/shared/mdi-pfade.js` (7447
   Symbole, 2,6 MB, erzeugt von `.scratch/karten-design/mdi-erzeugen.js` aus der
@@ -1362,7 +1375,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-635 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+641 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

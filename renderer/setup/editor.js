@@ -315,10 +315,41 @@ async function unterleisteRendern() {
   });
 }
 
+/**
+ * Die Symbol-Pfade aus Home Assistant nachladen -- genau wie die Anzeige es tut.
+ *
+ * Der Editor hat sie NIE geladen. Eine Sensorkarte zeigte hier deshalb immer das allgemeine
+ * Zeichen, auf der Wand aber das aus Home Assistant -- eine Vorschau, die etwas anderes zeigt
+ * als das Ergebnis, ist schlimmer als keine. Gemeldet wurde es als "er nimmt das Symbol nicht".
+ *
+ * Die Datei ist 2,6 MB gross und wird deshalb erst geholt, wenn wirklich eine Karte sie
+ * braucht -- und danach nie wieder.
+ */
+let mdiVersprechen = null;
+function mdiPfadeLaden() {
+  if (window.MDI_PFADE) return Promise.resolve();
+  if (mdiVersprechen) return mdiVersprechen;
+  mdiVersprechen = new Promise((fertig) => {
+    const s = document.createElement('script');
+    s.src = '/shared/mdi-pfade.js';
+    // Auch bei einem Fehlschlag weitermachen: Ohne die Datei fehlt ein Symbol, ohne das
+    // `fertig()` baut der Editor gar nichts mehr auf.
+    s.onload = () => fertig();
+    s.onerror = () => { mdiVersprechen = null; fertig(); };
+    document.head.appendChild(s);
+  });
+  return mdiVersprechen;
+}
+
 async function render() {
   const grid = $('grid');
   grid.innerHTML = '';
   arbeitsflaecheAnpassen();
+  if (currentLayout.some(e => DashboardRender.brauchtMdi(
+      e.card_type || defaultCardType(e.entity_id, statesById[e.entity_id]),
+      statesById[e.entity_id], e.settings || {}))) {
+    await mdiPfadeLaden();
+  }
   await unterleisteRendern();
   kartenListeRendern();
   // Dieselben Farben wie auf der Wand -- der Editor soll zeigen, was dort steht, und nicht
