@@ -1051,6 +1051,144 @@ body.tracker-an .unterleiste { flex: 0 0 11vh; }
 body.tracker-an .unterleiste:empty { flex: 0 0 0; padding: 0; }
 .empty { grid-column: 1 / -1; text-align: center; color: var(--muted); padding: 6vh 0; font-size: 1.8vh; }
 
+/* --- Der Dashboard-Typ "Status" ----------------------------------------------------------
+   Eine Seite, die aus fuenf Metern beantwortet, ob gerade etwas kaputt ist -- und erst beim
+   Naehertreten, was genau. Deshalb drei Ebenen in abnehmender Groesse: Urteil, Stoerungen,
+   alle Dienste.
+
+   Alles muss auf EINEN Bildschirm. Gescrollt wird hier nicht: Auf einem Wandpanel sieht
+   niemand, dass es unterhalb der Kante weitergeht -- und was man nicht sieht, ist so gut wie
+   nicht da. Die Kachelflaeche bekommt ihre Spalten- und Zeilenzahl deshalb gerechnet
+   (statusRaster), nicht aus `auto-fill`. */
+.status-view { flex: 1; min-height: 0; display: flex; padding: 0 2vw 1vh; }
+.st { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 1.2vh; }
+
+/* Die vier Zustandsfarben. Dieselben wie im Energiediagramm -- zwei Gruentoene im selben
+   System waeren zwei Aussagen, die gleich aussehen. */
+.st {
+  --st-up: #57c98a;
+  --st-down: #e8623c;
+  --st-pending: #f5b544;
+  --st-wartung: #5b8def;
+}
+/* Auf hellem Grund tragen dieselben Toene zu wenig -- besonders das Gelb verschwindet fast.
+   Nachgedunkelt, nicht ausgetauscht: Es soll dieselbe Farbe bleiben, nur lesbar. */
+body.light-theme .st {
+  --st-up: #2f9c63;
+  --st-down: #c8431f;
+  --st-pending: #b57c0a;
+  --st-wartung: #3a63b8;
+}
+
+/* --- Das Urteil ---------------------------------------------------------------------- */
+.st-kopf {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 2vh;
+  padding: 1.8vh 2.4vh; border-radius: 22px;
+  background: var(--panel2); border: 1px solid var(--card-border);
+}
+/* Dies ist die EINE Stelle, an der Farbe Flaeche sein darf -- und das ist eine Ausnahme von
+   ADR 0004, keine Nachlaessigkeit. Auf einer Karte konkurriert eine eingefaerbte Flaeche mit
+   dem Wert darauf; hier IST die Farbe die Aussage, und sie muss aus fuenf Metern tragen. In
+   der Probe nachgestellt (`?weit`, alles auf ein Fuenftel): Ein Balken von sieben Pixeln ist
+   dort anderthalb Pixel breit und damit nicht vorhanden. Die getoente Flaeche bleibt.
+   Gruen ist bewusst SCHWAECHER getoent als Rot: "alles in Ordnung" soll ruhig aussehen und
+   nicht leuchten -- auffallen muss nur der andere Fall.
+   Beide Faelle stehen ausdruecklich da, auch der, der ohnehin die Vorgabe traefe: Eine Klasse
+   ohne Regel ist genauso tot wie eine Regel ohne Klasse, und `st-kopf-ok` stand im JS, ohne
+   dass es dafuer je eine Zeile gab. Ein Test vergleicht beide Richtungen. */
+.st-kopf { border-left: 1.4vh solid var(--st-up); }
+.st-kopf-ok { border-left-color: var(--st-up);
+  background: color-mix(in srgb, var(--st-up) 10%, var(--panel2)); }
+.st-kopf-alarm { border-left-color: var(--st-down);
+  background: color-mix(in srgb, var(--st-down) 24%, var(--panel2)); }
+.st-zeichen { width: 7vh; height: 7vh; flex: 0 0 auto; color: var(--st-up); }
+.st-kopf-alarm .st-zeichen { color: var(--st-down); }
+.st-zeichen svg { width: 100%; height: 100%; display: block; }
+.st-kopf-text { min-width: 0; }
+.st-titel { font-size: 5vh; font-weight: 300; line-height: 1.05; letter-spacing: -0.02em; }
+.st-unter { font-size: 1.9vh; color: var(--muted); margin-top: 0.4vh; }
+
+/* --- Die Stoerungen ------------------------------------------------------------------ */
+.st-stoerungen {
+  flex: 0 0 auto; display: flex; flex-wrap: wrap; gap: 1.2vh 2.4vh;
+  padding: 1.4vh 2.4vh; border-radius: 22px;
+  background: var(--panel2); border: 1px solid var(--card-border);
+}
+.st-gruppe { min-width: 0; }
+.st-gruppe-titel { font-size: 1.4vh; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 0.1em; margin-bottom: 0.7vh; }
+.st-gruppe-liste { display: flex; flex-wrap: wrap; gap: 0.8vh; }
+/* Der Name steht hier GROSS -- groesser als in der Kachel unten. Wer vor der Wand steht, soll
+   lesen koennen, was ausgefallen ist, ohne naeher heranzugehen; die Kachelflaeche darunter
+   beantwortet dann die Frage "und was ist mit dem Rest". */
+.st-pille {
+  font-size: 2.2vh; font-weight: 600; line-height: 1.2;
+  padding: 0.5vh 1.4vh; border-radius: 999px;
+  color: var(--st-down);
+  border: 2px solid color-mix(in srgb, var(--st-down) 55%, transparent);
+  background: color-mix(in srgb, var(--st-down) 12%, transparent);
+}
+
+/* --- Alle Dienste -------------------------------------------------------------------- */
+.st-raster {
+  flex: 1; min-height: 0; display: grid; gap: 1vh;
+  grid-template-columns: repeat(var(--st-spalten, 4), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--st-zeilen, 4), minmax(0, 1fr));
+}
+/* `container-type: size` schaltet die cqmin-Einheiten darin frei: Die Schrift richtet sich
+   nach der Kachel, nicht nach dem Bildschirm. Bei acht Diensten sind die Kacheln gross und
+   die Namen gross; bei vierzig wird beides kleiner, ohne dass hier eine zweite Zahl steht. */
+.st-kachel {
+  container-type: size;
+  min-width: 0; min-height: 0; overflow: hidden;
+  display: flex; align-items: center; gap: 1.4cqmin;
+  padding: 0 4cqmin; border-radius: 14px;
+  background: var(--panel2); border: 1px solid var(--card-border);
+  border-left: 3px solid var(--st-up);
+}
+.st-kachel.st-up { border-left-color: var(--st-up); }
+.st-kachel.st-down { border-left-color: var(--st-down); }
+.st-kachel.st-pending { border-left-color: var(--st-pending); }
+.st-kachel.st-wartung { border-left-color: var(--st-wartung); }
+/* Die ausgefallene Kachel bekommt zusaetzlich einen Hauch Flaeche. Sie steht ohnehin oben
+   links (statusMonitore sortiert danach) -- aber wenn das Auge erst unten ist, soll es
+   zurueckfinden. */
+.st-kachel.st-down { background: color-mix(in srgb, var(--st-down) 22%, var(--panel2)); }
+
+.st-punkt { flex: 0 0 auto; width: 9cqmin; height: 9cqmin; max-width: 1.4vh; max-height: 1.4vh;
+  border-radius: 50%; background: var(--st-up); }
+.st-down .st-punkt { background: var(--st-down); }
+.st-pending .st-punkt { background: var(--st-pending); }
+.st-wartung .st-punkt { background: var(--st-wartung); }
+/* Nur das Kaputte blinkt. Blinkte alles, waere die Seite eine Lichterkette und das Blinken
+   keine Aussage mehr. */
+.st-down .st-punkt { animation: st-puls 1.6s ease-in-out infinite; }
+@keyframes st-puls { 0%, 100% { opacity: 1 } 50% { opacity: 0.25 } }
+@media (prefers-reduced-motion: reduce) {
+  .st-down .st-punkt { animation: none; }
+}
+
+.st-name { flex: 1; min-width: 0; font-size: clamp(8px, 19cqmin, 2.4vh);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Die Zahlen sind Beiwerk: Sie beantworten "wie gut", nachdem der Punkt "ob" beantwortet hat.
+   Tabellenziffern, damit die Spalte nicht zappelt, wenn sich eine Antwortzeit aendert. */
+.st-werte { flex: 0 0 auto; font-size: clamp(7px, 15cqmin, 1.9vh); color: var(--muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.st-trenn { margin: 0 0.6cqmin; opacity: 0.5; }
+
+/* Gar keine Monitore gefunden ist NICHT "alles in Ordnung" -- und sieht deshalb auch nicht so
+   aus. Ein gruener Haken ueber einer leeren Flaeche sagt "geprueft", und geprueft wurde nichts. */
+.st-leer { flex: 1; display: flex; flex-direction: column; justify-content: center;
+  align-items: center; text-align: center; gap: 1.2vh; padding: 0 10vw; }
+.st-leer-titel { font-size: 3.4vh; font-weight: 300; }
+.st-leer-text { font-size: 1.9vh; color: var(--muted); max-width: 60ch; line-height: 1.45; }
+
+/* Wie auf einem Tracker-Dashboard: Der Streifen unten darf sich die Hoehe nicht mit der
+   Statusflaeche teilen, sonst steht eine bildschirmhohe Uhr ueber den Kacheln. */
+body.status-an .unterleiste { flex: 0 0 11vh; }
+body.status-an .unterleiste:empty { flex: 0 0 0; padding: 0; }
+
+
 /* Ankuendigungs-Box: erscheint, wenn die konfigurierte input_text-Entitaet Inhalt hat --
    dunkelt alles ab, der Rahmen "zeichnet" sich zuegig, danach faedet der Text ein. */
 /* --- Ankuendigung -------------------------------------------------------------------------

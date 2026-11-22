@@ -36,15 +36,21 @@ async function load() {
     return;
   }
   dashboards.forEach(d => {
-    const isTracker = d.type === 'tracker';
     const row = document.createElement('div');
     row.className = 'dash-item';
+    // Die Statusseite hat KEINE Einrichtung -- sie sucht ihre Dienste selbst. Statt eines
+    // Links, der auf eine leere Seite fuehrt, steht dort, warum es nichts einzustellen gibt:
+    // Ein Knopf, der nichts tut, laesst einen suchen, was man falsch gemacht hat.
+    const art = { tracker: '📍 Tracker', status: '🩺 Status' }[d.type] || '🃏 Karten';
+    const einrichten = d.type === 'tracker'
+      ? `<a class="edit-link" href="tracker-editor.html?dashboard=${encodeURIComponent(d.id)}">Einrichten</a>`
+      : d.type === 'status'
+        ? '<span class="note" style="margin:0;">findet die Dienste selbst</span>'
+        : `<a class="edit-link" href="editor.html?dashboard=${encodeURIComponent(d.id)}">Karten bearbeiten</a>`;
     row.innerHTML = `
       <input type="text" value="${d.name}" data-id="${d.id}">
-      <span class="dash-type-badge">${isTracker ? '📍 Tracker' : '🃏 Karten'}</span>
-      ${isTracker
-        ? `<a class="edit-link" href="tracker-editor.html?dashboard=${encodeURIComponent(d.id)}">Einrichten</a>`
-        : `<a class="edit-link" href="editor.html?dashboard=${encodeURIComponent(d.id)}">Karten bearbeiten</a>`}
+      <span class="dash-type-badge">${art}</span>
+      ${einrichten}
       <button class="save-link" data-id="${d.id}">Name speichern</button>
       <button class="export-link" data-id="${d.id}">Exportieren</button>
       <button class="delete-link" data-id="${d.id}">Löschen</button>
@@ -282,9 +288,10 @@ $('createBtn').addEventListener('click', async () => {
   if (data.ok) {
     $('newName').value = '';
     $('newTrackerEntity').value = '';
-    $('result').textContent = type === 'tracker'
-      ? 'Angelegt – Zeitraum & Details findest du unter "Einrichten".'
-      : 'Angelegt – jetzt "Karten bearbeiten" nutzen, um Inhalte hinzuzufügen.';
+    $('result').textContent = {
+      tracker: 'Angelegt – Zeitraum & Details findest du unter "Einrichten".',
+      status: 'Angelegt – es gibt nichts einzustellen: Die Seite sucht die überwachten Dienste selbst.'
+    }[type] || 'Angelegt – jetzt "Karten bearbeiten" nutzen, um Inhalte hinzuzufügen.';
     $('result').className = 'result ok';
     load();
   } else {

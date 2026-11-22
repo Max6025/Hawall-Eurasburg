@@ -3807,6 +3807,254 @@
     document.head.appendChild(styleEl);
   }
 
+  // --- Der Dashboard-Typ "Status" ---------------------------------------------------------------
+  //
+  // Der dritte Typ neben Karten und Tracker -- und der einzige, den man NICHT einrichtet: Er
+  // sucht sich seine Dienste selbst. Das ist die Entscheidung dahinter und keine Faulheit. Eine
+  // Uebersicht, die man von Hand nachpflegen muss, zeigt genau den Dienst nicht, den man
+  // gestern dazugehaengt hat -- und das faellt an dem Tag auf, an dem er ausfaellt.
+
+  /**
+   * Die Zustaende, die ein Uptime-Kuma-Monitor melden kann.
+   *
+   * Das sind ROHWERTE und bleiben englisch, auch auf einem deutschen Home Assistant --
+   * uebersetzt wird erst in der Oberflaeche. Genau deshalb laesst sich daran erkennen, WAS
+   * eine Entitaet ist, ohne ihren Namen zu lesen. Dieselbe Lehre wie bei `sc.exe`: die Werte
+   * lesen, nie die uebersetzten Beschriftungen (siehe CLAUDE.md).
+   *
+   * `rang` ist die Reihenfolge auf dem Schirm. Das Kaputte steht oben links, wo das Auge
+   * zuerst hinfaellt -- eine Statusseite, auf der man die rote Kachel suchen muss, hat ihren
+   * Zweck verfehlt.
+   */
+  const STATUS_ZUSTAENDE = {
+    down: { rang: 0, text: 'Ausgefallen', klasse: 'st-down' },
+    pending: { rang: 1, text: 'Wackelt', klasse: 'st-pending' },
+    maintenance: { rang: 2, text: 'In Wartung', klasse: 'st-wartung' },
+    up: { rang: 3, text: 'Erreichbar', klasse: 'st-up' }
+  };
+
+  // Der Name der Statusentitaet endet auf " Status" -- in beiden Sprachen dasselbe Wort.
+  function statusName(zustand) {
+    const roh = (zustand.attributes && zustand.attributes.friendly_name) || zustand.entity_id;
+    return String(roh).replace(/\s*status\s*$/i, '').trim() || String(roh);
+  }
+
+  /**
+   * Alle Uptime-Kuma-Monitore aus den Zustaenden heraussuchen.
+   *
+   * Erkannt wird an dem, was NICHT uebersetzt wird:
+   *   - der Zustand ist einer aus STATUS_ZUSTAENDE (up/down/pending/maintenance),
+   *   - es gibt Geschwister-Entitaeten mit demselben Stamm (sonst ist es irgendein Sensor,
+   *     der zufaellig "up" meldet -- davon gibt es genug),
+   *   - und meldet ein Geschwister den Wert `group`, ist das eine Ueberschrift in Kuma und
+   *     kein Dienst. Die wuerde sonst als zusaetzliche Kachel erscheinen, die immer gruen ist.
+   *
+   * Antwortzeit und Verfuegbarkeit kommen ueber die EINHEIT ("ms", "%"), nicht ueber den
+   * Namen: `_antwortzeit` heisst auf einem englischen Home Assistant `_response_time`, und
+   * eine Liste mit beiden Schreibweisen waere beim naechsten Sprachwechsel wieder unvollstaendig.
+   */
+  function statusMonitore(statesById) {
+    const alle = Object.values(statesById || {}).filter(s => s && s.entity_id);
+    const einheit = (e) => (e.attributes && e.attributes.unit_of_measurement) || '';
+    // Nur was wirklich eine Zahl ist. `Number('unavailable')` ist NaN, und NaN laeuft lautlos
+    // bis in die Anzeige durch -- dieselbe Falle wie bei `Number(null)` in akkuStufe().
+    const zahl = (e) => {
+      if (!e) return null;
+      const n = Number(e.state);
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const raus = [];
+    for (const s of alle) {
+      if (!STATUS_ZUSTAENDE[String(s.state)]) continue;
+      if (s.entity_id.slice(0, 7) !== 'sensor.') continue;
+      const i = s.entity_id.lastIndexOf('_');
+      if (i < 0) continue;
+
+      // Geschwister sind alle Entitaeten, deren Kennung mit demselben Stamm ANFAENGT -- nicht
+      // die, deren Kennung genau ein Wort laenger ist. `_verfugbarkeit_30_tage` sind drei
+      // Woerter, `_response_time` zwei: Wer nur auf gleiche Laenge prueft, findet auf einem
+      // englischen Home Assistant keinen einzigen Nachbarn und wirft jeden Monitor weg.
+      const stamm = s.entity_id.slice(0, i) + '_';
+      const geschwister = alle.filter(g => g.entity_id !== s.entity_id && g.entity_id.startsWith(stamm));
+      if (!geschwister.length) continue;
+      if (geschwister.some(g => String(g.state) === 'group')) continue;
+
+      const ms = geschwister.find(g => einheit(g) === 'ms');
+      const quote = geschwister.find(g => einheit(g) === '%' && /30/.test(g.entity_id));
+      const gerundet = zahl(ms);
+      raus.push({
+        entity_id: s.entity_id,
+        name: statusName(s),
+        zustand: String(s.state),
+        ms: gerundet === null ? null : Math.round(gerundet),
+        quote: zahl(quote)
+      });
+    }
+
+    raus.sort((a, b) => (STATUS_ZUSTAENDE[a.zustand].rang - STATUS_ZUSTAENDE[b.zustand].rang)
+      || a.name.localeCompare(b.name, 'de'));
+    return raus;
+  }
+
+  // Die Ueberschriften der Stoerungsgruppen, in der Reihenfolge, in der sie jemanden angehen.
+  const STATUS_GRUPPEN = [
+    ['kuma', 'Nicht erreichbar'],
+    ['integrationen', 'Integration hängt'],
+    ['hardware', 'Hardware']
+  ];
+
+  /**
+   * Die Sammel-Entitaet, falls es eine gibt -- erkannt an ihrer FORM, nicht an ihrer Kennung.
+   *
+   * Sie traegt die Stoerungen nach Art getrennt in ihren Attributen (`alle`, `kuma`,
+   * `integrationen`, `hardware`). Wer sie umbenennt, verliert sie deshalb nicht; und wer sie
+   * gar nicht hat, bekommt die Stoerungen aus den Monitoren selbst (siehe statusProbleme).
+   *
+   * Sie ist mehr wert als die Monitore allein: Eine haengende Integration und ein Geraet, das
+   * sich nicht meldet, stehen in Uptime Kuma nirgends.
+   */
+  function statusSammler(statesById) {
+    for (const s of Object.values(statesById || {})) {
+      const a = s && s.attributes;
+      if (!a || !Array.isArray(a.alle)) continue;
+      if (!STATUS_GRUPPEN.some(([k]) => Array.isArray(a[k]))) continue;
+      return s;
+    }
+    return null;
+  }
+
+  /** Was gerade nicht stimmt: nach Art gruppiert, mit Gesamtzahl. */
+  function statusProbleme(statesById, monitore) {
+    const sammler = statusSammler(statesById);
+    if (sammler) {
+      const gruppen = STATUS_GRUPPEN
+        .map(([k, titel]) => ({ titel, eintraege: (sammler.attributes[k] || []).map(String) }))
+        .filter(g => g.eintraege.length);
+      return {
+        gruppen,
+        anzahl: gruppen.reduce((n, g) => n + g.eintraege.length, 0),
+        quelle: sammler.entity_id
+      };
+    }
+    // Ohne Sammel-Entitaet bleiben die Monitore. "In Wartung" ist dabei KEINE Stoerung --
+    // sonst schlaegt die Seite genau dann Alarm, wenn jemand angekuendigt daran arbeitet.
+    const aus = monitore.filter(m => m.zustand === 'down' || m.zustand === 'pending');
+    return aus.length
+      ? { gruppen: [{ titel: 'Nicht erreichbar', eintraege: aus.map(m => m.name) }], anzahl: aus.length, quelle: '' }
+      : { gruppen: [], anzahl: 0, quelle: '' };
+  }
+
+  /**
+   * Wie viele Spalten und Zeilen die Kachelflaeche bekommt.
+   *
+   * Die Forderung war "alles auf einem Bildschirm", und die laesst sich nicht an das CSS
+   * abgeben: `auto-fill` fuellt die Breite und schiebt den Rest nach unten aus dem Bild. Also
+   * wird gerechnet -- aus der Anzahl und dem SEITENVERHAELTNIS der Flaeche, das die Anzeige
+   * misst. Eine feste Spaltenzahl waere bei 6 Diensten eine leere Wand und bei 60 ein Gitter
+   * aus Streifen.
+   *
+   * `ZIEL` ist die Form, die eine Kachel anstreben soll: deutlich breiter als hoch, weil
+   * darin ein Name steht und daneben zwei Zahlen.
+   */
+  const STATUS_KACHEL_FORM = 2.8;
+  function statusRaster(anzahl, seitenverhaeltnis) {
+    const n = Math.max(1, Math.round(Number(anzahl) || 0));
+    const r = Number(seitenverhaeltnis) > 0 ? Number(seitenverhaeltnis) : 2.5;
+    const spalten = Math.min(n, Math.max(1, Math.round(Math.sqrt(n * r / STATUS_KACHEL_FORM))));
+    return { spalten, zeilen: Math.ceil(n / spalten) };
+  }
+
+  /**
+   * Welche Entitaeten diese Seite ueberhaupt angehen -- fuer den Filter der Live-Verbindung.
+   *
+   * Dieselbe Rolle wie `kartenEntitaeten()` bei den Karten, und aus demselben Grund EINE
+   * Funktion: Ohne sie traegt der Filter noch das vorher gezeigte Dashboard, und ausgerechnet
+   * die Meldung "ein Dienst ist ausgefallen" faellt durch.
+   *
+   * Antwortzeit und Verfuegbarkeit stehen bewusst NICHT drin. Die aendern sich bei jedem
+   * einzelnen Ping; die Seite wuerde sich dauernd neu bauen, um eine Zahl zu drehen, die
+   * niemand von der Wand abliest. Sie kommen mit dem regelmaessigen Abruf nach.
+   */
+  function statusEntitaeten(statesById) {
+    const raus = new Set();
+    const sammler = statusSammler(statesById);
+    if (sammler) raus.add(sammler.entity_id);
+    for (const m of statusMonitore(statesById)) raus.add(m.entity_id);
+    return raus;
+  }
+
+  const STATUS_HAKEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
+  const STATUS_ALARM = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3L1.5 21h21z"/><path d="M12 9v5"/><circle cx="12" cy="17.6" r="1.1" fill="currentColor" stroke="none"/></svg>';
+
+  /**
+   * Die ganze Statusseite als HTML.
+   *
+   * Reine Funktion: rein die Zustaende, raus der Text. Deshalb laesst sich pruefen, dass eine
+   * ausgefallene Kachel oben steht und dass die Zahl in der Ueberschrift zur Liste darunter
+   * passt -- ohne Home Assistant und ohne Bildschirm.
+   */
+  function statusAnsicht(statesById, opts = {}) {
+    const monitore = statusMonitore(statesById);
+    const probleme = statusProbleme(statesById, monitore);
+    const ok = probleme.anzahl === 0;
+    const erreichbar = monitore.filter(m => m.zustand === 'up').length;
+    const raster = statusRaster(monitore.length, opts.seitenverhaeltnis);
+
+    // Nichts gefunden heisst NICHT "alles in Ordnung". Ein gruener Haken ueber einer leeren
+    // Flaeche ist die gefaehrlichste Anzeige von allen: Sie sagt "geprueft", und geprueft
+    // wurde nichts.
+    if (!monitore.length && !probleme.anzahl) {
+      return `
+        <div class="st">
+          <div class="st-leer">
+            <div class="st-leer-titel">Keine Überwachung gefunden</div>
+            <div class="st-leer-text">Diese Seite sucht die Monitore selbst in Home Assistant.
+              Sobald die Uptime-Kuma-Integration dort Entitäten anlegt, stehen sie hier.</div>
+          </div>
+        </div>`;
+    }
+
+    const kopf = `
+      <div class="st-kopf ${ok ? 'st-kopf-ok' : 'st-kopf-alarm'}">
+        <div class="st-zeichen">${ok ? STATUS_HAKEN : STATUS_ALARM}</div>
+        <div class="st-kopf-text">
+          <div class="st-titel">${ok ? 'Alles in Ordnung'
+            : esc(probleme.anzahl + (probleme.anzahl === 1 ? ' Störung' : ' Störungen'))}</div>
+          <div class="st-unter">${esc(erreichbar)} von ${esc(monitore.length)} Diensten erreichbar</div>
+        </div>
+      </div>`;
+
+    // Die Stoerungen stehen GROSS und oben, nicht als rote Kachel irgendwo im Gitter. Wer vor
+    // der Wand steht, soll den Namen lesen koennen, ohne naeher heranzugehen.
+    const stoerungen = probleme.gruppen.length ? `
+      <div class="st-stoerungen">
+        ${probleme.gruppen.map(g => `
+          <div class="st-gruppe">
+            <div class="st-gruppe-titel">${esc(g.titel)}</div>
+            <div class="st-gruppe-liste">${g.eintraege.map(e =>
+              `<span class="st-pille">${esc(e)}</span>`).join('')}</div>
+          </div>`).join('')}
+      </div>` : '';
+
+    const zahl = (v, einheit, stellen) => (v === null || !Number.isFinite(v)) ? ''
+      : v.toLocaleString('de-DE', { minimumFractionDigits: stellen, maximumFractionDigits: stellen }) + einheit;
+
+    const kacheln = monitore.length ? `
+      <div class="st-raster" style="--st-spalten:${raster.spalten};--st-zeilen:${raster.zeilen}">
+        ${monitore.map(m => `
+          <div class="st-kachel ${STATUS_ZUSTAENDE[m.zustand].klasse}">
+            <span class="st-punkt" aria-hidden="true"></span>
+            <span class="st-name">${esc(m.name)}</span>
+            <span class="st-werte">${esc(zahl(m.ms, ' ms', 0))}${
+              m.ms !== null && m.quote !== null ? '<span class="st-trenn">·</span>' : ''
+            }${esc(zahl(m.quote, ' %', 1))}</span>
+          </div>`).join('')}
+      </div>` : '';
+
+    return `<div class="st">${kopf}${stoerungen}${kacheln}</div>`;
+  }
+
   global.DashboardRender = {
     ICONS, DOMAIN_LABEL, CARD_TYPES, TOGGLE_DOMAINS, PRESS_DOMAINS,
     defaultCardType, allowedCardTypes, defaultSize, buildCard,
@@ -3818,6 +4066,10 @@
     DETAIL_TYPEN,
     verlaufStunden,
     detailInhalt,
+    // Der Dashboard-Typ "Status" als reine Funktionen: rein die Zustaende, raus der Text.
+    // Dadurch laesst sich pruefen, dass das Ausgefallene oben steht und dass die Zahl in der
+    // Ueberschrift zur Liste darunter passt -- ohne Home Assistant und ohne Bildschirm.
+    statusMonitore, statusProbleme, statusRaster, statusAnsicht, statusEntitaeten, STATUS_ZUSTAENDE,
     // Der Tippstrich im Verlauf: Welcher Punkt gemeint ist und wo er waagerecht liegt, sind
     // reine Funktionen. Nur so laesst sich pruefen, dass Strich und Punkt an derselben Stelle
     // sitzen, ohne einen Finger zu haben.

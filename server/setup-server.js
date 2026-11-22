@@ -144,6 +144,11 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
   // separate Entitaeten-Auswahl, die jederzeit NACH der Ersteinrichtung aufgerufen wird).
   // Optionaler ?domain=-Parameter liefert gezielt eine sonst ausgeschlossene Domain
   // (z.B. "sun" fuer die Tag/Nacht-Theme-Auswahl), ohne sie generell freizugeben.
+  // Die Arten eines Unterdashboards. Als Liste und nicht als Kette von Vergleichen: Eine
+  // vierte Art kommt sonst an jeder Stelle einzeln dazu, und die vergessene Stelle macht
+  // stillschweigend ein Kartendashboard daraus.
+  const DASHBOARD_ARTEN = ['cards', 'tracker', 'status'];
+
   app.get('/api/entities', async (req, res) => {
     const haUrl = store.get('haUrl');
     const token = store.get('token');
@@ -1036,13 +1041,16 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     }
   });
 
-  // Neues Dashboard anlegen -- type "cards" (Standard, wie bisher) oder "tracker"
-  // (Kartenansicht mit Standort+Verlauf eines device_tracker, z.B. fuer ein GPS-Halsband).
+  // Neues Dashboard anlegen. Drei Arten, und nur die ersten beiden werden eingerichtet:
+  //   cards   -- das Kartenraster, wie bisher
+  //   tracker -- Standort und Verlauf eines device_tracker (z.B. ein GPS-Halsband)
+  //   status  -- die Uebersicht der ueberwachten Dienste; sie sucht sie SELBST und hat
+  //              deshalb kein Layout und keine Einstellungen (siehe DASHBOARD_ARTEN).
   app.post('/api/dashboards', (req, res) => {
     const { name, type, trackerEntity } = req.body || {};
     const list = store.get('dashboards') || [];
     const id = 'db_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    const entry = { id, name: (name || 'Dashboard').trim() || 'Dashboard', type: type === 'tracker' ? 'tracker' : 'cards', layout: [] };
+    const entry = { id, name: (name || 'Dashboard').trim() || 'Dashboard', type: DASHBOARD_ARTEN.includes(type) ? type : 'cards', layout: [] };
     if (entry.type === 'tracker') entry.trackerEntity = trackerEntity || '';
     list.push(entry);
     store.set('dashboards', list);

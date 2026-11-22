@@ -46,6 +46,11 @@
         </div>
         <div id="trackerMap"></div>
       </div>
+      <!-- Der Dashboard-Typ "Status": eine Seite, die sich ihre Dienste SELBST sucht. Sie hat
+           deshalb kein Raster und keine Einrichtung -- der Inhalt kommt bei jedem Abruf frisch
+           aus den Zustaenden (statusAnsicht). Steht wie die Tracker-Ansicht VOR der
+           Unterleiste, damit die sich die Hoehe nicht mit ihr teilt. -->
+      <div class="status-view" id="statusView" style="display:none;"></div>
       <!-- Der Streifen, den das 6-Zeilen-Raster unten uebrig laesst. Er war bisher einfach
            leer; jetzt kann dort eine Karte stehen -- gedacht fuer Uhrzeit und Datum.
            STEHT ABSICHTLICH NACH der Tracker-Ansicht: Davor bekam er auf einem
@@ -256,19 +261,69 @@ async function navigateTo(targetId) {
   if (currentDashboardId === 'main') $('title').textContent = config.title || 'Wall Display';
   renderRoomTabs();
   rueckkehrTaktAnpassen();
-  const dashInfo = dashboardOrder.find(d => d.id === currentDashboardId);
-  if (dashInfo && dashInfo.type === 'tracker') {
-    $('grid').style.display = 'none';
-    $('trackerView').style.display = 'flex';
-    // Die Leiste darf sich hier NICHT die Hoehe mit der Karte teilen, siehe dashboard.css.
-    document.body.classList.add('tracker-an');
-    await renderTrackerView(currentDashboardId);
-  } else {
-    $('trackerView').style.display = 'none';
-    $('grid').style.display = 'grid';
-    document.body.classList.remove('tracker-an');
-    await render();
-  }
+  const art = aktuelleAnsicht();
+  ansichtUmschalten(art);
+  if (art === 'tracker') await renderTrackerView(currentDashboardId);
+  else if (art === 'status') await renderStatusView();
+  else await render();
+}
+
+/**
+ * Welche der drei Ansichten dieses Dashboard braucht: 'cards', 'tracker' oder 'status'.
+ *
+ * An EINER Stelle beantwortet, und zwar aus dem Dashboard-Eintrag. Mit zwei Typen reichte ein
+ * `type === 'tracker'` an jeder Stelle; mit dreien waeren das drei Vergleiche pro Stelle, und
+ * die vergessene Stelle zeigt die falsche Ansicht, ohne dass etwas nach einem Fehler aussieht.
+ */
+function aktuelleAnsicht() {
+  const d = dashboardOrder.find(x => x.id === currentDashboardId);
+  const typ = d && d.type;
+  return (typ === 'tracker' || typ === 'status') ? typ : 'cards';
+}
+
+/**
+ * Die sichtbare Ansicht umschalten -- alle drei auf einmal.
+ *
+ * Jede Ansicht hier auszublenden, statt es dem Zweig zu ueberlassen, der die naechste
+ * einblendet: Sonst muss jeder Zweig an die beiden ANDEREN denken, und der, der es vergisst,
+ * legt zwei Ansichten uebereinander.
+ */
+function ansichtUmschalten(art) {
+  $('grid').style.display = art === 'cards' ? 'grid' : 'none';
+  $('trackerView').style.display = art === 'tracker' ? 'flex' : 'none';
+  $('statusView').style.display = art === 'status' ? 'flex' : 'none';
+  // Die Unterleiste darf sich ihre Hoehe mit keiner der beiden Vollflaechen teilen, sonst
+  // steht eine bildschirmhohe Uhr darueber -- siehe dashboard.css.
+  document.body.classList.toggle('tracker-an', art === 'tracker');
+  document.body.classList.toggle('status-an', art === 'status');
+}
+
+/**
+ * Die Statusseite zeichnen.
+ *
+ * Sie wird bei JEDEM Abruf neu gebaut -- es gibt nichts zu vergleichen, was billiger waere
+ * als der Neuaufbau selbst: ein paar Dutzend Kacheln aus einer Zeichenkette.
+ *
+ * Das Seitenverhaeltnis kommt aus dem gemessenen Kasten und nicht aus einer Zahl im Code:
+ * Daraus rechnet `statusRaster()` Spalten und Zeilen, damit alles auf EINEN Bildschirm passt.
+ * Gemessen wird nach dem Einblenden -- ein `display: none` hat die Groesse 0, und bei 0 waere
+ * die Rechnung ein Raten.
+ */
+async function renderStatusView() {
+  const el = $('statusView');
+  if (!el) return;
+  const d = dashboardOrder.find(x => x.id === currentDashboardId);
+  if (d && d.name) $('title').textContent = d.name;
+  const kasten = el.getBoundingClientRect();
+  el.innerHTML = DashboardRender.statusAnsicht(statesById, {
+    seitenverhaeltnis: kasten.height > 0 ? kasten.width / kasten.height : 0
+  });
+  // Dieselbe Rolle wie `kartenEntitaeten()` bei den Karten: Ohne das traegt der Filter der
+  // Live-Verbindung noch das vorher gezeigte Dashboard.
+  letzteAnzeigeEntitaeten = DashboardRender.statusEntitaeten(statesById);
+  if (config && config.sunEntity) letzteAnzeigeEntitaeten.add(config.sunEntity);
+  if (config && config.notifyEntity) letzteAnzeigeEntitaeten.add(config.notifyEntity);
+  (schonerLayout || []).forEach(e => { if (e.entity_id) letzteAnzeigeEntitaeten.add(e.entity_id); });
 }
 
 // --- Tracker-Unterdashboard: Standort + Verlauf auf einer OpenStreetMap-Karte (z.B. fuer
@@ -923,12 +978,10 @@ async function refresh() {
   // Das offene Detailfenster mitziehen. Ohne das steht dort eine Zahl von vor dreissig
   // Sekunden -- bei einem Energiefluss-Diagramm schlechter als die Karte darunter.
   detailAktualisieren();
-  const dashInfo = dashboardOrder.find(d => d.id === currentDashboardId);
-  if (dashInfo && dashInfo.type === 'tracker') {
-    await renderTrackerView(currentDashboardId); // aktualisiert Position/Akku/Zonen, nicht das (versteckte) Karten-Raster
-  } else {
-    await render();
-  }
+  const art = aktuelleAnsicht();
+  if (art === 'tracker') await renderTrackerView(currentDashboardId); // Position/Akku/Zonen, nicht das versteckte Karten-Raster
+  else if (art === 'status') await renderStatusView();
+  else await render();
 }
 
 function applyTheme() {
@@ -1653,6 +1706,7 @@ function betrifftDiesesDashboard(entityId) {
   if (!letzteAnzeigeEntitaeten) return true;   // noch nichts gezeichnet: lieber einmal zuviel
   return letzteAnzeigeEntitaeten.has(entityId);
 }
+
 
 // --- Von allein zurueck aufs Hauptdashboard ----------------------------------------------------
 //

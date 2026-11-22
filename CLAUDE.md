@@ -51,6 +51,7 @@ auch laufen, wenn gerade kein Dashboard geladen ist.
 | `renderer/shared/buehne.js` | Die driftenden Farbwolken — ein Partikelsystem, ohne jede Entscheidung |
 | `renderer/shared/markdown.js` | Der kleine Markdown-Satz für eingetippte Texte |
 | `renderer/shared/dashboard-render.js` | Kartenkatalog und Rendering; enthält auch das eingebaute Design `DEFAULT_THEME` |
+| `renderer/dashboard.html` (Ansichten) | Drei Dashboard-Typen: Karten, Tracker, Status — umgeschaltet in `ansichtUmschalten()` |
 
 Die Rangfolge in `decide()` ist die einzige Stelle, an der entschieden wird, ob das Panel an
 sein soll. Sie ist kurz, und das soll sie bleiben:
@@ -629,6 +630,56 @@ sehen ist, gehört dagegen ausdrücklich **nicht** hierher — das ist Sache des
   `dashboard.css`; ein Test vergleicht beide, weil ein Auseinanderlaufen keinen Fehler ergibt,
   sondern genau diesen Rand.
 
+- **Der dritte Dashboard-Typ „Status" richtet sich NICHT ein — er sucht sich die Dienste
+  selbst.** Das ist die Entscheidung dahinter und keine Faulheit: Eine Übersicht, die man von
+  Hand nachpflegen muss, zeigt genau den Dienst nicht, den man gestern dazugehängt hat — und
+  das fällt an dem Tag auf, an dem er ausfällt. Sieben Punkte hängen daran:
+  1. **Erkannt wird am ZUSTAND, nicht am Namen** (`statusMonitore()`). `up`/`down`/`pending`/
+     `maintenance` sind Rohwerte und bleiben englisch, auch auf einem deutschen Home Assistant;
+     übersetzt wird erst in der Oberfläche. Die *Kennung* dagegen wird aus dem übersetzten
+     Namen gebildet (`_antwortzeit` gegen `_response_time`) und ist damit sprachabhängig.
+     Dieselbe Lehre wie bei `sc.exe`: die Werte lesen, nie die Beschriftungen. Antwortzeit und
+     Verfügbarkeit kommen aus der **Einheit** (`ms`, `%`), aus demselben Grund.
+  2. **Geschwister werden über den PRÄFIX gesucht**, nicht über „eine Kennung, die genau ein
+     Wort länger ist". `_verfugbarkeit_30_tage` sind drei Wörter, `_response_time` zwei — der
+     erste Anlauf prüfte auf gleiche Länge und fand auf einem englischen Home Assistant keinen
+     einzigen Nachbarn, warf also jeden Monitor weg. Ein Test stellt beide Sprachen nach.
+  3. **Eine Gruppe ist eine Überschrift, kein Dienst.** Meldet ein Geschwister den Rohwert
+     `group`, fällt der Eintrag raus: Als Kachel wäre er eine Zeile, die immer grün ist und
+     nichts überwacht — und er verfälscht „x von y erreichbar" in beide Richtungen.
+  4. **Die Sammel-Entität wird an ihrer FORM erkannt** (`statusSammler()`), nicht an ihrer
+     Kennung: ein Sensor mit den Attributen `alle`, `kuma`, `integrationen`, `hardware`. Wer
+     sie umbenennt, verliert sie deshalb nicht. Sie ist mehr wert als die Monitore allein — eine
+     hängende Integration und ein Gerät, das sich nicht meldet, stehen in Uptime Kuma nirgends.
+     Fehlt sie, zählen die Monitore selbst; **„in Wartung" ist dabei keine Störung**, sonst
+     schlägt die Seite Alarm, wenn jemand angekündigt daran arbeitet.
+  5. **Das Raster wird gerechnet** (`statusRaster()`), nicht an `auto-fill` abgegeben. Das füllt
+     die Breite und schiebt den Rest nach unten aus dem Bild — auf einer Wand sieht niemand,
+     dass es unterhalb der Kante weitergeht. Spalten und Zeilen kommen aus der Anzahl und dem
+     **gemessenen** Seitenverhältnis der Fläche; eine feste Spaltenzahl wäre bei 6 Diensten eine
+     leere Wand und bei 60 ein Gitter aus Streifen.
+  6. **Hier darf Farbe Fläche sein** — die eine Ausnahme von [ADR 0004](docs/adr/0004-farbe-als-akzent-statt-als-kachelfarbe.md).
+     Auf einer Karte konkurriert eine eingefärbte Fläche mit dem Wert darauf; hier **ist** die
+     Farbe die Aussage. In der Probe nachgestellt (`?weit`, alles auf ein Fünftel): Ein Balken
+     von sieben Pixeln ist dort anderthalb Pixel breit und damit nicht vorhanden, die getönte
+     Fläche bleibt. Grün ist schwächer getönt als Rot — „alles in Ordnung" soll ruhig aussehen.
+  7. **Nichts gefunden ist NICHT „alles in Ordnung".** Ein grüner Haken über einer leeren Fläche
+     ist die gefährlichste Anzeige von allen: Er sagt „geprüft", und geprüft wurde nichts. Genau
+     so sähe ein kaputter Erkennungsweg aus, deshalb steht dort ein eigener Text.
+
+  Die Seite meldet ihre Entitäten über `statusEntitaeten()` an den Live-Filter — dieselbe Rolle
+  wie `kartenEntitaeten()` bei den Karten. Ohne das trägt `letzteAnzeigeEntitaeten` noch das
+  vorher gezeigte Dashboard, und ausgerechnet die Meldung „ein Dienst ist ausgefallen" fällt
+  durch. Antwortzeit und Verfügbarkeit stehen bewusst **nicht** drin: Die ändern sich bei jedem
+  Ping, und die Seite würde sich dauernd neu bauen, um eine Zahl zu drehen, die niemand von der
+  Wand abliest.
+
+  Umgeschaltet wird in **`ansichtUmschalten()`** — an einer Stelle, und dort werden alle drei
+  Ansichten angefasst. Mit zwei Typen reichte ein if/else; mit dreien müsste sonst jeder Zweig
+  an die beiden *anderen* denken, und der, der es vergisst, legt zwei Ansichten übereinander.
+  Ansehen: `.scratch/statusseite/probe.html` — `?fall=viele` (60 Dienste), `?fall=leer`,
+  `?hell`, `?weit`. Die Probe **misst nach**, ob es wirklich auf einen Bildschirm passt
+  (`scrollHeight` gegen `clientHeight`), statt es zu behaupten.
 - **Karten brauchen mehr als ihren Zustand, und das steht an einer Stelle.** `kartenZusatz()`
   in `dashboard.html` holt Verlauf, Vorhersage, Mülltermine und Energiequellen. Zwei Flächen
   bauen Karten — das Dashboard und der Bildschirmschoner —, und die zweite Fläche holte in
@@ -1290,7 +1341,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-581 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+627 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

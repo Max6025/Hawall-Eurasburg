@@ -112,9 +112,17 @@ function exportieren(dashboard, kartenArten) {
     format: FORMAT,
     version: VERSION,
     name: d.name || 'Dashboard',
-    art: d.type === 'tracker' ? 'tracker' : 'karten',
+    art: { tracker: 'tracker', status: 'status' }[d.type] || 'karten',
     karten
   };
+
+  // Eine Statusseite hat nichts, was mitreisen koennte: kein Layout, keine Einstellungen.
+  // Sie wird trotzdem ausgegeben und eingelesen -- sonst ist ausgerechnet die Seite, die man
+  // ohne Arbeit auf einem zweiten Panel haben moechte, die einzige, die man nicht mitnehmen
+  // kann. Beim Einspielen entsteht sie leer und sucht sich ihre Dienste dort selbst.
+  if (datei.art === 'status') {
+    datei.karten = [];
+  }
 
   if (datei.art === 'tracker') {
     datei.tracker = { entitaet: d.trackerEntity || '' };
@@ -141,6 +149,9 @@ function anleitung(kartenArten) {
   return {
     wozu: 'Ein Dashboard für Hawall Eurasburg. Diese Datei lässt sich unter '
       + '"Unterdashboards" wieder einspielen.',
+    dashboardart: 'Das Feld "art" ganz oben: "karten" (Vorgabe), "tracker" oder "status". '
+      + 'Eine Statusseite trägt keine Karten – sie sucht die überwachten Dienste selbst in '
+      + 'Home Assistant und braucht deshalb nichts außer ihrem Namen.',
     raster: `${SPALTEN} Spalten mal ${ZEILEN} Zeilen. x zählt von links ab 0, y von oben ab 0. `
       + 'Karten dürfen sich nicht überlappen und nicht über den Rand hinausragen.',
     untereLeiste: 'Eine Karte darf statt x/y/spalten/zeilen das Feld "unten": true tragen. Sie '
@@ -275,7 +286,8 @@ function importieren(roh, kartenArten) {
 
   const dashboard = {
     name: (typeof roh.name === 'string' && roh.name.trim()) ? roh.name.trim() : 'Importiert',
-    type: (roh.art === 'tracker' || roh.type === 'tracker') ? 'tracker' : 'cards',
+    type: (roh.art === 'status' || roh.type === 'status') ? 'status'
+      : ((roh.art === 'tracker' || roh.type === 'tracker') ? 'tracker' : 'cards'),
     layout
   };
   if (dashboard.type === 'tracker') {
