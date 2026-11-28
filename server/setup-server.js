@@ -330,11 +330,11 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     const b = req.body || {};
     // Nur bekannte Felder, nur einfache Werte.
     const erlaubt = ['schonerLag', 'deckte', 'geweckt', 'schonerLiegt', 'deckt', 'contentVisibility', 'karten',
-      'kartenHoehe', 'gaesteVorn', 'gaesteSchoner', 'anlass', 'lichtThema', 'bewegungen'];
+      'kartenHoehe', 'gaesteVorn', 'gaesteSchoner', 'anlass', 'lichtThema', 'bewegungen', 'stimme', 'stimmeErgebnis'];
     pruefErgebnis = {};
     for (const k of erlaubt) {
       const v = b[k];
-      if (['string', 'number', 'boolean'].includes(typeof v)) pruefErgebnis[k] = typeof v === 'string' ? v.slice(0, 40) : v;
+      if (['string', 'number', 'boolean'].includes(typeof v)) pruefErgebnis[k] = typeof v === 'string' ? v.slice(0, 60) : v;
     }
     pruefErgebnis.gemeldet = new Date().toISOString();
     res.json({ ok: true });

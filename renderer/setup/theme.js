@@ -392,12 +392,15 @@ if (wmPruefen) {
   let kontext = null;
   $('anlassTonHier').addEventListener('click', () => {
     try {
+      // Erst der Ruf des Weihnachtsmanns -- mit der Stimme DIESES Browsers; auf der Wand spricht
+      // die Stimme des Panels und kann anders klingen. Danach die Schellen des Schlittens.
+      const gesprochen = AnlassModul.hohoho(window.speechSynthesis, window.SpeechSynthesisUtterance, { text: 'Ho, ho, ho!' });
       if (!kontext) kontext = new (window.AudioContext || window.webkitAudioContext)();
       if (kontext.state === 'suspended') kontext.resume();
-      // Erst die Schellen des Schlittens, danach das Glockenspiel des Weihnachtsmanns.
-      const r = AnlassModul.tonSpielen(kontext, 'schellen', { dauer: 4 });
-      setTimeout(() => AnlassModul.tonSpielen(kontext, 'glockenspiel'), r.ende * 1000 + 300);
-      ergebnis('Erst die Schellen (Schlitten), dann das Glockenspiel (Weihnachtsmann).', true);
+      setTimeout(() => AnlassModul.tonSpielen(kontext, 'schellen', { dauer: 4 }), gesprochen ? 2600 : 0);
+      ergebnis(gesprochen
+        ? 'Erst „Ho, ho, ho!“ (mit der Stimme dieses Browsers – auf der Wand spricht die des Panels), dann die Schellen.'
+        : 'Dieser Browser hat keine Sprachausgabe; zu hören sind nur die Schellen. Auf der Wand ruft der Weihnachtsmann.', true);
     } catch (e) {
       ergebnis('Dieser Browser gibt keinen Ton her: ' + String(e && e.message || e), false);
     }
@@ -407,7 +410,7 @@ if (wmPruefen) {
       const r = await fetch('/api/anzeige/anlass-ton', { method: 'POST' }).then(x => x.json());
       if (!r.ok) return ergebnis('Fehler: ' + (r.error || 'unbekannt'), false);
       ergebnis(r.anzeigen > 0
-        ? 'Abgeschickt – auf der Wand fliegt jetzt der Schlitten vorbei, mit Schellen.'
+        ? 'Abgeschickt – auf der Wand taucht jetzt der Weihnachtsmann auf und ruft „Ho, ho, ho!“.'
         : 'Es hört gerade keine Anzeige zu – läuft das Wall Display?', r.anzeigen > 0);
     } catch (e) {
       ergebnis('Nicht erreichbar: ' + String(e && e.message || e), false);

@@ -480,3 +480,63 @@ test('Liegt der Schoner, ruht das Dashboard darunter -- und wacht vor ihm auf', 
   const fn = seite.slice(seite.indexOf('function dashboardRuhen'), seite.indexOf('function dashboardRuhen') + 500);
   assert.match(fn, /clearTimeout\(dashboardRuheTakt\)/);
 });
+
+// --- Ho, ho, ho -----------------------------------------------------------------------------------
+//
+// Die Rueckmeldung zu den ersten Geraeuschen: "Ich moechte nicht, dass die Vorwarnung kommt ...
+// sondern wenn der Weihnachtsmann von unten kommt und winkt, dann kommt ho ho ho." Das
+// Glockenspiel klang beim LOSFAHREN, anderthalb Sekunden bevor er zu sehen war -- ein Signalton,
+// der etwas ankuendigt. Jetzt ruft er, und zwar erst, wenn er oben ist.
+
+test('Der Weihnachtsmann ruft, statt zu klingeln -- und erst, wenn er oben ist', () => {
+  assert.strictEqual(A.AUFTRITTE.figur.ton, 'hohoho');
+  // Bei 13 % der Dauer ist er oben, bis 82 % bleibt er: Der Ruf faellt in diese Spanne.
+  assert.ok(A.AUFTRITTE.figur.tonNach >= 0.15 && A.AUFTRITTE.figur.tonNach <= 0.4, 'der Ruf kommt, waehrend er winkt');
+  // Kein Auftritt toent VOR seinem Erscheinen, und was still ist, hat keinen Ton.
+  for (const [name, a] of Object.entries(A.AUFTRITTE)) {
+    assert.ok(a.tonNach >= 0 && a.tonNach < 0.5, `${name}: tonNach ${a.tonNach}`);
+  }
+  assert.strictEqual(A.AUFTRITTE.schnuppe.ton, '', 'eine Sternschnuppe ist still');
+  // Im Zeitgeber: Der Rueckruf laeuft ueber einen eigenen Zeitgeber, und stoppen() raeumt ihn ab.
+  const quelle = lies('renderer/shared/anlass.js');
+  assert.match(quelle, /this\.tonZeitgeber = setTimeout\(\(\) => \{[\s\S]{0,160}w\.dauer \* AUFTRITTE\[name\]\.tonNach \* 1000\)/);
+  const stopp = quelle.slice(quelle.indexOf('Auftritte.prototype.stoppen'), quelle.indexOf('Auftritte.prototype.laeuft'));
+  assert.match(stopp, /clearTimeout\(this\.tonZeitgeber\)/, 'ein ausstehender Ruf muss beim Hinlegen weg');
+});
+
+test('Die Stimme: eine deutsche Maennerstimme, sonst eine deutsche, sonst irgendeine', () => {
+  const S = (name, lang) => ({ name, lang });
+  // So sieht die Liste auf dem Panel in Eurasburg aus.
+  const panel = [S('Microsoft Hedda Desktop - German', 'de-DE'), S('Microsoft Zira Desktop - English (United States)', 'en-US'),
+    S('Microsoft Hedda - German (Germany)', 'de-DE'), S('Microsoft Katja - German (Germany)', 'de-DE'), S('Microsoft Stefan - German (Germany)', 'de-DE')];
+  assert.strictEqual(A.stimmeWaehlen(panel).name, 'Microsoft Stefan - German (Germany)');
+  assert.strictEqual(A.stimmeWaehlen([S('Zira', 'en-US'), S('Hedda', 'de-DE')]).name, 'Hedda', 'lieber deutsch als englisch');
+  assert.strictEqual(A.stimmeWaehlen([S('Zira', 'en-US')]).name, 'Zira', 'lieber irgendeine als keine');
+  assert.strictEqual(A.stimmeWaehlen([]), null);
+  assert.strictEqual(A.stimmeWaehlen(null), null);
+});
+
+test('Ho, ho, ho: tief, gemaechlich, und ohne Stimme lieber gar nicht', () => {
+  const gesprochen = [];
+  function Aeusserung(text) { this.text = text; }
+  const synth = { getVoices: () => [{ name: 'Microsoft Stefan - German (Germany)', lang: 'de-DE' }],
+    speak: (a) => gesprochen.push(a), cancel() { this.abgebrochen = true; }, speaking: false, pending: false };
+  assert.strictEqual(A.hohoho(synth, Aeusserung, { zufall: () => 0 }), true);
+  assert.strictEqual(gesprochen.length, 1);
+  assert.match(gesprochen[0].text, /^Ho, ho, ho!/);
+  assert.ok(gesprochen[0].pitch < 0.6, 'tiefer als die normale Stimme');
+  assert.ok(gesprochen[0].rate < 1, 'langsamer als normal');
+  assert.strictEqual(gesprochen[0].voice.name, 'Microsoft Stefan - German (Germany)');
+  // Jeder Ruf beginnt mit Ho, ho, ho -- und die meisten sind nur das.
+  assert.ok(A.RUFE.every(r => r.startsWith('Ho, ho, ho!')));
+  assert.ok(A.RUFE.filter(r => r === 'Ho, ho, ho!').length > A.RUFE.length / 2, 'eine Wand, die jedes Mal einen Satz sagt, wird abgeschaltet');
+  // Laeuft noch einer, wird nicht gestapelt.
+  synth.speaking = true; A.hohoho(synth, Aeusserung); assert.strictEqual(synth.abgebrochen, true);
+  // Keine Stimme, keine Sprachausgabe: false -- dann nimmt der Aufrufer das Glockenspiel.
+  assert.strictEqual(A.hohoho({ getVoices: () => [], speak() {} }, Aeusserung), false);
+  assert.strictEqual(A.hohoho(null, Aeusserung), false);
+  assert.strictEqual(A.hohoho(synth, undefined), false);
+  const seite = lies('renderer/dashboard.html');
+  assert.match(seite, /AnlassModul\.hohoho\(window\.speechSynthesis, window\.SpeechSynthesisUtterance/);
+  assert.match(seite, /ton === 'hohoho' \? 'glockenspiel' : ton/, 'ohne Stimme bleibt das Glockenspiel');
+});

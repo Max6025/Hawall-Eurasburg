@@ -518,13 +518,20 @@
   // CSS-Animation auf der Grafikeinheit. Zwischen zwei Auftritten rechnet niemand.
   //
   // `gewicht`: wie oft er im Verhältnis drankommt. `ton`: was dazu klingt (siehe tonSpielen).
+  //
+  // `tonNach`: nach welchem Anteil der Dauer der Ton kommt. DER TON GEHÖRT ZUM AUGENBLICK, NICHT
+  // DAVOR. In 1.0.42 klang das Glockenspiel in dem Moment, in dem der Weihnachtsmann unten
+  // LOSFUHR -- anderthalb Sekunden, bevor von ihm etwas zu sehen war. Gemeldet wurde das als
+  // "Vorwarnung", und genau das war es: ein Signalton, der etwas ankündigt. Gewünscht ist das
+  // Gegenteil: "wenn der Weihnachtsmann von unten kommt und winkt, dann kommt ho ho ho". Also
+  // erst, wenn er OBEN ist. Und er SAGT es (ton 'hohoho', siehe hohoho()), statt zu klingeln.
   const AUFTRITTE = {
-    schlitten:  { gewicht: 4, ton: 'schellen' },
-    figur:      { gewicht: 3, ton: 'glockenspiel' },
-    rudolf:     { gewicht: 2, ton: 'gloeckchen' },
-    schnuppe:   { gewicht: 2, ton: 'sternklang' },
-    fallschirm: { gewicht: 2, ton: '' },
-    kranz:      { gewicht: 2, ton: '' }
+    schlitten:  { gewicht: 4, ton: 'schellen',   tonNach: 0.03 },  // er ist sofort im Bild
+    figur:      { gewicht: 3, ton: 'hohoho',     tonNach: 0.2 },   // oben angekommen, winkt
+    rudolf:     { gewicht: 2, ton: 'gloeckchen', tonNach: 0.17 },  // der Kopf ist herein
+    schnuppe:   { gewicht: 2, ton: '',           tonNach: 0 },     // eine Sternschnuppe ist still
+    fallschirm: { gewicht: 2, ton: '',           tonNach: 0 },
+    kranz:      { gewicht: 2, ton: '',           tonNach: 0 }
   };
 
   /**
@@ -573,6 +580,7 @@
     this.schicht = schicht;
     this.opt = Object.assign({ szene: 'klein', ersterMin: 8, ersterMax: 22, warteMin: 45, warteMax: 140 }, optionen || {});
     this.zeitgeber = 0;
+    this.tonZeitgeber = 0;
     this.aktiv = false;
     this.zuletzt = '';
   }
@@ -580,8 +588,11 @@
     clearTimeout(this.zeitgeber);
     this.zeitgeber = setTimeout(() => this.auftreten(), (min + Math.random() * (max - min)) * 1000);
   };
-  /** Einen Auftritt JETZT auslösen (auch von außen: Probe, Ton-Test). Liefert den Namen. */
-  Auftritte.prototype.auftreten = function (erzwungen) {
+  /**
+   * Einen Auftritt JETZT auslösen (auch von außen: Probe, Ton-Test). Liefert den Namen.
+   * `stumm`: ohne den Ton-Rückruf -- wer von außen auslöst, spielt seinen Ton selbst.
+   */
+  Auftritte.prototype.auftreten = function (erzwungen, stumm) {
     if (!this.aktiv && !erzwungen) return '';
     const elemente = Array.from(this.schicht.querySelectorAll('[data-auftritt]'));
     const frei = elemente.filter(e => !e.classList.contains('laeuft')).map(e => e.dataset.auftritt);
@@ -602,8 +613,13 @@
       };
       el.addEventListener('animationend', fertig);
       this.zuletzt = name;
-      if (this.opt.beiAuftritt) {
-        try { this.opt.beiAuftritt(name, { dauer: w.dauer, richtung: w.klassen.includes('von-rechts') ? -1 : 1, ton: AUFTRITTE[name].ton }); } catch (e) { /* Ton ist Zugabe */ }
+      if (this.opt.beiAuftritt && !stumm && AUFTRITTE[name].ton) {
+        // Der Ton kommt, wenn zu sehen ist, was ihn macht -- nicht beim Losfahren.
+        const info = { dauer: w.dauer, richtung: w.klassen.includes('von-rechts') ? -1 : 1, ton: AUFTRITTE[name].ton };
+        clearTimeout(this.tonZeitgeber);
+        this.tonZeitgeber = setTimeout(() => {
+          try { this.opt.beiAuftritt(name, info); } catch (e) { /* Ton ist Zugabe */ }
+        }, w.dauer * AUFTRITTE[name].tonNach * 1000);
       }
     }
     if (this.aktiv) this._planen(this.opt.warteMin, this.opt.warteMax);
@@ -617,7 +633,11 @@
   Auftritte.prototype.stoppen = function () {
     this.aktiv = false;
     clearTimeout(this.zeitgeber);
+    // Auch ein Ton, der noch aussteht: Legt sich der Schoner hin, bevor der Weihnachtsmann oben
+    // ist, soll er nicht aus dem Nichts rufen.
+    clearTimeout(this.tonZeitgeber);
     this.zeitgeber = 0;
+    this.tonZeitgeber = 0;
     this.schicht.querySelectorAll('[data-auftritt].laeuft').forEach(e => e.classList.remove('laeuft'));
   };
   Auftritte.prototype.laeuft = function () { return !!this.aktiv; };
@@ -710,6 +730,63 @@
     return { stimmen, ende };
   }
 
+  // --- Ho, ho, ho --------------------------------------------------------------------------------
+  //
+  // Der Weihnachtsmann SAGT etwas. Ein Ruf lässt sich nicht aus Sinustönen rechnen wie eine
+  // Schelle, und eine Tondatei müsste mitgeliefert werden. Windows bringt aber Stimmen mit, und
+  // Chromium reicht sie durch (speechSynthesis): Auf dem Panel in Eurasburg ist "Microsoft
+  // Stefan" installiert, eine deutsche Männerstimme. Tief und langsam gesprochen ist das ein
+  // brauchbares "Ho, ho, ho!" -- kein Schauspieler, aber ein Ruf und kein Klingelton.
+  //
+  // Gibt es keine Stimme (ein anderes Gerät, ein Browser ohne Sprachausgabe), sagt hohoho()
+  // false, und der Aufrufer nimmt das Glockenspiel.
+
+  // Was er ruft. Meist nur das eine -- eine Wand, die jedes Mal einen ganzen Satz sagt, wird
+  // am zweiten Tag abgeschaltet.
+  const RUFE = ['Ho, ho, ho!', 'Ho, ho, ho!', 'Ho, ho, ho!', 'Ho, ho, ho! Frohe Weihnachten!'];
+
+  /**
+   * Die Stimme für den Ruf: eine deutsche Männerstimme, sonst irgendeine deutsche, sonst die
+   * erste. Reine Funktion über die Liste, die speechSynthesis.getVoices() liefert.
+   */
+  function stimmeWaehlen(stimmen) {
+    const liste = Array.isArray(stimmen) ? stimmen.filter(Boolean) : [];
+    if (!liste.length) return null;
+    const deutsch = liste.filter(s => /^de([-_]|$)/i.test(String(s.lang || '')) || /german|deutsch/i.test(String(s.name || '')));
+    const mann = /stefan|conrad|killian|bernd|christoph|klaus|ralf|male|m[aä]nn/i;
+    return deutsch.find(s => mann.test(String(s.name || ''))) || deutsch[0] || liste.find(s => mann.test(String(s.name || ''))) || liste[0];
+  }
+
+  /**
+   * "Ho, ho, ho!" sprechen. `synth` ist speechSynthesis, `Aeusserung` der Konstruktor
+   * SpeechSynthesisUtterance -- beide hereingereicht, damit es ohne Browser prüfbar bleibt.
+   * optionen: { text, laut (0..1), beiEnde(ergebnis) }
+   * Liefert true, wenn gesprochen wird; false, wenn es keine Sprachausgabe oder keine Stimme gibt.
+   */
+  function hohoho(synth, Aeusserung, optionen) {
+    const o = optionen || {};
+    if (!synth || typeof Aeusserung !== 'function' || typeof synth.speak !== 'function') return false;
+    const stimme = stimmeWaehlen(typeof synth.getVoices === 'function' ? synth.getVoices() : []);
+    if (!stimme) return false;
+    const r = o.zufall || Math.random;
+    const a = new Aeusserung(o.text || RUFE[Math.floor(r() * RUFE.length)]);
+    a.voice = stimme;
+    a.lang = stimme.lang || 'de-DE';
+    // Tief und gemächlich: 1 ist die normale Tonhöhe und das normale Tempo.
+    a.pitch = 0.2;
+    a.rate = 0.8;
+    a.volume = o.laut === undefined ? 1 : Math.max(0, Math.min(1, o.laut));
+    if (o.beiEnde) {
+      a.onend = () => o.beiEnde('gesprochen');
+      a.onerror = (ev) => o.beiEnde('fehler: ' + String((ev && ev.error) || 'unbekannt'));
+    }
+    // Ein Ruf, der noch läuft oder ansteht, wird nicht gestapelt -- sonst ruft er nach einer
+    // Pause dreimal hintereinander.
+    if (typeof synth.cancel === 'function' && (synth.speaking || synth.pending)) synth.cancel();
+    synth.speak(a);
+    return true;
+  }
+
   /**
    * Der ganze Inhalt der Schicht als HTML.
    *
@@ -780,7 +857,7 @@
   const api = {
     anlassErmitteln, adventStand, figurFuer, schildText, anlassZustand, flockenDaten, schneeHtml,
     adventskranzSvg, girlandeHtml, schichtHtml, schichtSetzen,
-    AUFTRITTE, auftrittWaehlen, auftrittWuerfeln, Auftritte, tonSpielen,
+    AUFTRITTE, auftrittWaehlen, auftrittWuerfeln, Auftritte, tonSpielen, hohoho, stimmeWaehlen, RUFE,
     FLOCKEN_VORGABE, BOEGEN, BUEHNE_TOENE_WEIHNACHTEN
   };
   global.AnlassModul = api;

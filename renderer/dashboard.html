@@ -1111,21 +1111,32 @@ function anlassGaesteAnpassen() {
 // `erzwingen` (der Knopf "Auf der Wand abspielen") uebergeht 2 und 3, nicht 1.
 const ANLASS_TON_SYSTEM_MINDESTENS = 25; // Prozent; angehoben wird wie beim Akku-Warnton nur nach oben
 let anlassTonLautGesetzt = false;
+// Was die Sprachausgabe zuletzt gemeldet hat -- fuer die Pruefung aus der Ferne (zustandMelden).
+let anlassStimmeErgebnis = '';
 function anlassTonSpielen(name, info, erzwingen) {
   const ton = (info && info.ton) || (AnlassModul.AUFTRITTE[name] && AnlassModul.AUFTRITTE[name].ton);
   if (!IM_PANEL || !ton) return false;
   if (!erzwingen && (!config || config.anlassTon === false)) return false;
   if (!erzwingen && schoner && schoner.istSichtbar()) return false;
   try {
-    if (!tonKontext) tonKontext = new (window.AudioContext || window.webkitAudioContext)();
-    if (tonKontext.state === 'suspended') tonKontext.resume();
     // Ein stummes Panel ist von einem funktionierenden nicht zu unterscheiden (siehe Akku-Ton).
     // Einmal je Start auf eine leise Mindestlautstaerke heben -- gesenkt wird nie.
     if (!anlassTonLautGesetzt && window.wallApi && window.wallApi.systemLautstaerkeAnheben) {
       anlassTonLautGesetzt = true;
       window.wallApi.systemLautstaerkeAnheben(ANLASS_TON_SYSTEM_MINDESTENS);
     }
-    AnlassModul.tonSpielen(tonKontext, ton, { dauer: info && info.dauer ? info.dauer * 0.7 : 5, richtung: (info && info.richtung) || 1 });
+    // Der Weihnachtsmann SAGT "Ho, ho, ho!" -- mit einer Stimme von Windows. Gibt es keine,
+    // bleibt das Glockenspiel.
+    if (ton === 'hohoho') {
+      anlassStimmeErgebnis = 'angefangen';
+      if (AnlassModul.hohoho(window.speechSynthesis, window.SpeechSynthesisUtterance,
+        { beiEnde: (ergebnis) => { anlassStimmeErgebnis = ergebnis; } })) return true;
+      anlassStimmeErgebnis = 'keine Stimme';
+    }
+    if (!tonKontext) tonKontext = new (window.AudioContext || window.webkitAudioContext)();
+    if (tonKontext.state === 'suspended') tonKontext.resume();
+    AnlassModul.tonSpielen(tonKontext, ton === 'hohoho' ? 'glockenspiel' : ton,
+      { dauer: info && info.dauer ? info.dauer * 0.7 : 5, richtung: (info && info.richtung) || 1 });
     return true;
   } catch (e) {
     return false;
@@ -1491,9 +1502,12 @@ function befehleEmpfangen() {
     if (befehl && befehl.befehl === 'bildrate') bildrateMessen(befehl.sekunden);
     if (befehl && befehl.befehl === 'zustand') zustandMelden(!!befehl.wecken);
     if (befehl && befehl.befehl === 'anlass-ton') {
+      // Der Weihnachtsmann taucht auf und ruft -- der Ruf kommt, wenn er oben ist, wie im
+      // Betrieb. `stumm`, weil der Ton hier erzwungen selbst gespielt wird (sonst riefe er auf
+      // dem Dashboard zweimal).
       const gaeste = (schoner && schoner.istSichtbar()) ? anlassGaeste.schoner : anlassGaeste.vorn;
-      if (gaeste) gaeste.auftreten('schlitten');
-      anlassTonSpielen('schlitten', { ton: 'schellen', dauer: 8, richtung: 1 }, true);
+      if (gaeste) gaeste.auftreten('figur', true);
+      setTimeout(() => anlassTonSpielen('figur', { ton: 'hohoho' }, true), 2000);
     }
   };
 }
@@ -1522,6 +1536,8 @@ function zustandMelden(wecken) {
       gaesteVorn: !!(anlassGaeste.vorn && anlassGaeste.vorn.laeuft()),
       gaesteSchoner: !!(anlassGaeste.schoner && anlassGaeste.schoner.laeuft()),
       anlass: document.body.classList.contains('anlass-weihnachten') ? 'weihnachten' : '',
+      stimme: (() => { try { const s = AnlassModul.stimmeWaehlen(window.speechSynthesis.getVoices()); return s ? s.name : ''; } catch (e) { return 'fehler'; } })(),
+      stimmeErgebnis: anlassStimmeErgebnis,
       lichtThema: document.body.classList.contains('light-theme'),
       bewegungen: document.getAnimations().length
     }, vorher);
