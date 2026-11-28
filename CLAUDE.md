@@ -49,7 +49,7 @@ auch laufen, wenn gerade kein Dashboard geladen ist.
 | `renderer/dashboard.html` | Anzeige; empfängt den Steuerungszustand per IPC, entscheidet nichts selbst. Läuft auch als **Live-Ansicht** unter `/live` im Browser |
 | `renderer/shared/bildschirmschoner.js` | Der Ruhezustand: `sollSchonen()` ist reine Entscheidung ohne DOM und ohne Netz, der Rest ist Anzeige |
 | `renderer/shared/buehne.js` | Die driftenden Farbwolken — ein Partikelsystem, ohne jede Entscheidung |
-| `renderer/shared/anlass.js` | Das Anlass-Design (Weihnachten): wann es gilt, der wievielte Advent ist, wer um die Ecke schaut — und die Schicht aus Schnee, Lichterkette und Schlitten |
+| `renderer/shared/anlass.js`, `anlass.css` | Das Weihnachtsdesign: wann es gilt, Adventskranz, Countdown-Schild, Nikolaus oder Weihnachtsmann — und Girlande, Winterszene, Schnee, bunte Karten |
 | `renderer/shared/markdown.js` | Der kleine Markdown-Satz für eingetippte Texte |
 | `renderer/shared/dashboard-render.js` | Kartenkatalog und Rendering; enthält auch das eingebaute Design `DEFAULT_THEME` |
 | `renderer/dashboard.html` (Ansichten) | Drei Dashboard-Typen: Karten, Tracker, Status — umgeschaltet in `ansichtUmschalten()` |
@@ -1444,42 +1444,74 @@ das ändert und pro Bild rechnet, kostet das Gerät die Bildrate — auf einem S
 kein theoretischer Einwand. Aus demselben Grund hält `stoppen()` die Formen an, sobald der
 Schoner nicht liegt oder ein Standbild darüber liegt.
 
-**Das Anlass-Design ist eine SCHICHT, kein drittes Farbschema** (`renderer/shared/anlass.js`,
-seit 1.0.39). Gewünscht war: *„über Weihnachten, bzw. ab jetzt, ein Weihnachtsdesign. Mit
-Schnee, mit einem Weihnachtsmann oder Nikolaus. Verspielt."* Hell und Dunkel bleiben, wie sie
-sind; darüber liegen Schnee, eine Lichterkette, eine Schneewehe am unteren Rand, und die Karten
-tragen Schneehauben. Alle zweieinhalb Minuten fliegt der Schlitten vorbei, alle zwei Minuten
-schaut unten rechts jemand um die Ecke. Sechs Punkte:
-1. **Ab Werk an**, vom 25. November bis zum 6. Januar (`anlassDesign: 'auto'`). Abschalten und
-   „immer" stehen bei den Design-Einstellungen. Eine Verbesserung, die man erst einschalten
-   muss, ist für die meisten keine.
-2. **Drei Dinge darin sind Auskunft, nicht Dekoration**, und dafür gibt es Tests: Der
-   Adventskranz zeigt, der wievielte Advent ist (so viele Kerzen brennen — der vierte Advent ist
-   der letzte Sonntag vor dem ersten Weihnachtstag, 2023 war das der 24.). Am 5. und 6. Dezember
-   kommt der **Nikolaus** mit Mitra und Stab, sonst der Weihnachtsmann; das ist bei uns nicht
-   dasselbe.
-3. **Der Zufall läuft nur beim Aufbau**, dieselbe Regel wie bei der Bühne. Jede Flocke bekommt
-   einmal Ort, Größe, Dauer und Drift als CSS-Variable; bewegt wird ausschließlich über
-   `transform` und `opacity`. Die Birnen der Lichterkette sind deshalb HTML und kein SVG — in
-   einem SVG müsste der Browser für jedes Funkeln die ganze Kette neu zeichnen.
-4. **Es schneit nie hinter einer deckenden Fläche.** Es gibt zwei Schichten, eine über dem
-   Dashboard und eine im Schoner; alles Bewegte trägt `.anlass-bewegt`, und zwei CSS-Regeln
-   halten jeweils die Schicht an, die gerade nicht zu sehen ist. Die Schicht über dem Dashboard
-   steht dafür im DOM **nach** dem Schoner (Geschwister-Regel) — ein Test hält die Reihenfolge
-   fest.
-5. **Gebaut wird nur bei geänderter Signatur** (`anlassZustand().signatur`: Anlass, Advent,
-   Figur). `anlassAnwenden()` läuft bei jedem Config-Abruf mit und tut fast immer nichts; der
-   Wechsel über Mitternacht kommt damit von selbst. Der Schoner baut sein Inneres beim Erzeugen
-   neu (`innerHTML`) — deshalb wird danach einmal erzwungen, sonst fehlt die Schicht dort.
-6. **Ohne „Hintergrund langsam bewegen" bleibt, was stillsteht**: Farben, Schneehauben,
-   Lichterkette, Schneewehe. Schnee, Schlitten und die beiden Gäste gibt es nur bewegt —
-   stehende Flocken wären Flecken.
+**Weihnachten ist ein EIGENES Aussehen, keine Schicht** (`renderer/shared/anlass.js` und
+`anlass.css`, seit 1.0.41). Gewünscht war: *„über Weihnachten, bzw. ab jetzt, ein
+Weihnachtsdesign. Mit Schnee, mit einem Weihnachtsmann oder Nikolaus. Verspielt."* Die erste
+Fassung (1.0.39) legte nur Schnee, eine Lichterkette und Schneehauben über dieselben Glaskarten —
+und die Rückmeldung dazu ist die Messlatte für alles hier: *„Das ist mir alles zu einfach und zu
+minimal gehalten. Du hast da einfach das bestehende Design genommen und ein paar Wolken dran
+gemacht. Ich möchte wirklich was mit viel Farben und wirklich Weihnachten."* Und danach:
+*„Schriftart, Schriftfarbe, gesamtes Layout kannst du auch ein anderes hernehmen."* Wer hier
+etwas ändert, misst es daran: **Zurückhaltung ist bei einem Anlass-Design der Fehler.**
 
-Die Schneehaube ist die Lichtkante `.card::before`, verbreitert und mit zwei Reihen ungleich
-großer Bogen: Eine Reihe allein sieht aus wie eine Borte. Der Kartenaufbau bleibt unangetastet.
-Ansehen: `.scratch/karten-design/weihnacht-probe.html` — `?hell`, `?datum=2026-12-06`,
-`?schnell` (Schlitten und Gäste alle paar Sekunden), `?steh` (alles im Bild, zum Ansehen der
-Zeichnungen), `?still`, `?aus`.
+Was es ist:
+1. **Die Karten sind bunt** — sechs Festfarben reihum (Rot, Tannengrün, Gold, Blau, Beere,
+   Petrol), jede mit eigenem Muster, weißem Zuckergussrand, gestickter Naht und Schneehaube.
+   Hier **ist** Farbe Fläche: die zweite ausdrückliche Ausnahme von
+   [ADR 0004](docs/adr/0004-farbe-als-akzent-statt-als-kachelfarbe.md) neben der Statusseite.
+   Fotos, Radar und Media Player bleiben, wie sie sind. Die **Energiekarte bleibt nachtblau**
+   (ihre Knotenfarben sind Auskunft und auf Rot oder Gold nicht zu lesen), und ein **Tor, das
+   klemmt**, bekommt eine dunkle Karte, auf der sein Rot leuchtet.
+2. **Eigener Kartenaufbau:** das Symbol in einer weißen Scheibe in der Kartenfarbe, der Wert in
+   der Weihnachtsschrift, der Name als Geschenkanhänger (weiße Pille). Alles per CSS —
+   `buildCard()` bleibt unangetastet, und ohne Anlass ist alles wie vorher.
+3. **Eigene Schrift:** Mountains of Christmas, fett, mitgeliefert (`schriften/HERKUNFT.md`).
+   **Aber ohne ihre Ziffern** (`unicode-range`): Die Schrift hat Mediävalziffern, ihre Null ist
+   ein kleines „o", und auf der Karte stand „1oo.5 L" und „15:oo". Die Ziffern kommen aus der
+   mitgelieferten Handschrift — auf einer Anzeige, die man wegen ihrer Zahlen ansieht, ist das
+   nicht verhandelbar.
+4. **Kein helles Design.** Die Karten tragen immer weiße Schrift; mit `light-theme` käme dunkle
+   Schrift auf Rot. `applyTheme()` setzt zu Weihnachten statt dessen `anlass-tag`, und das
+   schaltet nur den Himmel hinter den Karten.
+5. **Der Rahmen:** oben eine Tannengirlande in acht Bögen mit Lichtern, roten Schleifen und
+   pendelnden Anhängern (Kugeln, Stern, Glocke, Zuckerstange). Unten auf dem **Schoner** eine
+   Winterszene: geschmückter Baum, Geschenke, Holzschild, Adventskranz, Häuschen mit rauchendem
+   Kamin, Schneemann — und rechts schaut ab und zu jemand hinter dem Schneehügel hervor. Auf dem
+   **Dashboard** ist dafür kein Platz (unten steht der Streifen mit der Uhr); dort tauchen Figur
+   und Kranz abwechselnd auf. Die Karten rücken für den Rahmen zusammen — die Abstände stehen
+   in `anlass.css` und nur dort.
+6. **Vier Dinge darin sind Auskunft, nicht Dekoration**, und dafür gibt es Tests: Das
+   **Holzschild** zählt die Kalendertage bis Heiligabend (am 23. um 23 Uhr „Noch 1 Tag", nicht
+   0) und wechselt danach den Text. Der **Adventskranz** zeigt, der wievielte Advent ist — so
+   viele Kerzen brennen (der vierte Advent ist der letzte Sonntag vor dem ersten Weihnachtstag,
+   2023 war das der 24.). Am 5. und 6. Dezember kommt der **Nikolaus** mit Mitra und Stab, sonst
+   der Weihnachtsmann; das ist bei uns nicht dasselbe.
+
+Was daran Technik ist:
+- **Ab Werk an**, vom 25. November bis zum 6. Januar (`anlassDesign: 'auto'`). Abschalten und
+  „immer" stehen bei den Design-Einstellungen.
+- **Der Zufall läuft nur beim Aufbau**, dieselbe Regel wie bei der Bühne. Jede Flocke und jeder
+  Anhänger bekommt einmal Ort, Größe und Takt als CSS-Variable; bewegt wird ausschließlich über
+  `transform` und `opacity`. Lichter und Anhänger sind deshalb HTML und kein SVG — in einem SVG
+  müsste der Browser für jedes Funkeln die ganze Girlande neu zeichnen.
+- **Es schneit nie hinter einer deckenden Fläche.** Zwei Schichten, eine über dem Dashboard und
+  eine im Schoner; alles Bewegte trägt `.anlass-bewegt`, und zwei CSS-Regeln halten jeweils die
+  Schicht an, die gerade nicht zu sehen ist. Die Schicht über dem Dashboard steht dafür im DOM
+  **nach** dem Schoner (Geschwister-Regel) — ein Test hält die Reihenfolge fest.
+- **Gebaut wird nur bei geänderter Signatur** (`anlassZustand().signatur`: Anlass, Advent,
+  Figur, Schildtext — also einmal am Tag). `anlassAnwenden()` läuft bei jedem Config-Abruf mit
+  und tut fast immer nichts. Der Schoner baut sein Inneres beim Erzeugen neu (`innerHTML`) —
+  deshalb wird danach einmal erzwungen, sonst fehlt die Schicht dort.
+- **Ein eigenes Stylesheet** (`anlass.css`), das nur `dashboard.html` lädt: Der Editor lädt
+  `dashboard.css` und bleibt damit, wie er ist.
+- **Ohne „Hintergrund langsam bewegen" bleibt, was stillsteht**: bunte Karten, Girlande, Szene.
+  Schnee, Schlitten und die Gäste gibt es nur bewegt.
+
+Ansehen: `.scratch/karten-design/weihnacht-probe.html` zeigt den Schoner (die Fläche, die fast
+immer zu sehen ist), `?dashboard` das Dashboard, `?tag`, `?datum=2026-12-06`, `?schnell`,
+`?steh`, `?still`, `?aus`. **Alle** Kartentypen im Weihnachtskleid zeigt
+`.scratch/karten-design/vorschau.html?weihnachten` (mit `&nur=climate` usw.) — dort ist die
+Energiekarte aufgefallen.
 
 Dabei gefunden: Die Design-Seite hat `hintergrundBewegung`, `desktopHintergrund` und
 `rueckkehrSekunden` gespeichert, aber **nie geladen**. Sie zeigte immer die Vorgabe, und jedes
@@ -1495,7 +1527,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-672 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+677 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

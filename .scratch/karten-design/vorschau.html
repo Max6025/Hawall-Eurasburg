@@ -115,6 +115,14 @@ const grid = document.getElementById('grid');
 DashboardRender.applyCustomTheme(DashboardRender.DEFAULT_THEME);
 // ?hell schaltet das helle Design an -- genau wie die Sonnenstand-Entitaet es im Betrieb tut.
 if (new URLSearchParams(location.search).has('hell')) document.body.classList.add('light-theme');
+// ?weihnachten legt das Anlass-Design ueber ALLE Kartentypen -- die Weihnachtsprobe zeigt nur
+// die, die auf dem Schoner liegen, und was hier fehlt, wird nicht angesehen.
+if (new URLSearchParams(location.search).has('weihnachten')) {
+  const blatt = document.createElement('link');
+  blatt.rel = 'stylesheet'; blatt.href = '../../renderer/shared/anlass.css';
+  document.head.appendChild(blatt);
+  document.body.classList.add('anlass-weihnachten');
+}
 
 // Erfundener Verlauf: eine leicht verrauschte Welle, damit die Flaeche im Hintergrund und
 // der Tendenzpfeil ueberhaupt etwas zu zeichnen haben.

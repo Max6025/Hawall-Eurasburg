@@ -1,0 +1,371 @@
+/* === Anlass-Design: Weihnachten ===================================================================
+   Aufbau und Begruendung stehen in shared/anlass.js; hier steht, wie es aussieht und sich bewegt.
+   Eine eigene Datei, weil es ein eigenes Aussehen ist und nicht mehr eine Schicht ueber dem
+   Glas-Design: Der Editor laedt dashboard.css, diese hier nicht -- im Editor bleibt alles, wie
+   es ist.
+
+   DIE ERSTE FASSUNG war Schnee ueber denselben Glaskarten, und die Rueckmeldung lautete: "zu
+   einfach und zu minimal, ich moechte wirklich was mit viel Farben und wirklich Weihnachten".
+   Deshalb sind jetzt die KARTEN selbst das Fest.
+
+   Bewegt wird ausschliesslich per transform und opacity (Grafikeinheit), und alles Bewegte
+   traegt .anlass-bewegt -- an dieser einen Klasse haengen Anhalten und Abschalten. Die Schicht
+   ueber dem Dashboard haelt an, solange der Schoner liegt, die im Schoner, solange er nicht
+   liegt: Es schneit nie hinter einer deckenden Flaeche. */
+
+/* --- Der Himmel. Nachts tiefblau mit bunten Lichtern, tagsueber ein heller Wintertag. Hell und
+   Dunkel des Glas-Designs gibt es zu Weihnachten nicht: Die Karten sind deckend bunt und tragen
+   immer weisse Schrift, und dashboard.html setzt statt light-theme die Klasse anlass-tag. */
+body.anlass-weihnachten {
+  background:
+    radial-gradient(50% 42% at 12% 16%, rgba(214,43,60,0.46) 0%, transparent 68%),
+    radial-gradient(46% 40% at 88% 22%, rgba(34,165,101,0.42) 0%, transparent 66%),
+    radial-gradient(58% 46% at 72% 90%, rgba(45,111,224,0.42) 0%, transparent 70%),
+    radial-gradient(40% 34% at 34% 74%, rgba(242,193,78,0.32) 0%, transparent 68%),
+    radial-gradient(34% 30% at 55% 40%, rgba(176,75,214,0.32) 0%, transparent 70%),
+    linear-gradient(180deg, #0a1236 0%, #171a52 60%, #35276a 100%);
+  background-attachment: fixed;
+}
+body.anlass-weihnachten.anlass-tag {
+  background:
+    radial-gradient(50% 42% at 12% 16%, rgba(255,255,255,0.75) 0%, transparent 68%),
+    radial-gradient(46% 40% at 88% 22%, rgba(255,255,255,0.6) 0%, transparent 66%),
+    radial-gradient(58% 46% at 72% 90%, rgba(255,255,255,0.8) 0%, transparent 70%),
+    linear-gradient(180deg, #4f9be0 0%, #9fd0f4 62%, #e6f4ff 100%);
+  background-attachment: fixed;
+}
+body.anlass-weihnachten .lebendig span:nth-child(1) { background: radial-gradient(circle, rgba(224,46,64,0.46), transparent 68%); }
+body.anlass-weihnachten .lebendig span:nth-child(2) { background: radial-gradient(circle, rgba(34,165,101,0.42), transparent 68%); }
+body.anlass-weihnachten .lebendig span:nth-child(3) { background: radial-gradient(circle, rgba(242,193,78,0.36), transparent 68%); }
+body.anlass-weihnachten.anlass-tag .lebendig { display: none; }
+/* Der Schoner ist immer Nacht: Er ist die Ruheflaeche, und die Lichter leuchten nur im Dunkeln. */
+body.anlass-weihnachten .bildschirmschoner {
+  background: linear-gradient(180deg, #0a1236 0%, #171a52 58%, #3a2a6e 100%);
+}
+
+/* --- Platz fuer den Rahmen. Oben haengt die Girlande, unten steht (auf dem Schoner) die
+   Winterszene -- die Karten ruecken dafuer zusammen. Auf dem Dashboard werden die sechs Zeilen
+   von 14vh auf 12,6vh niedriger; die Zahl steht nur hier, weil nur hier jemand sie aendert. */
+body.anlass-weihnachten .bs-inhalt { padding: 9vh 2vw 15.4vh; }
+body.anlass-weihnachten .main { padding-top: 8vh; }
+body.anlass-weihnachten .grid { grid-template-rows: repeat(6, 12.6vh); grid-auto-rows: 12.6vh; }
+body.anlass-weihnachten .unterleiste { padding-bottom: 2.2vh; }
+/* Die Karte im Streifen ist nur ein paar Zentimeter hoch: Eine volle Schneehaube laege dort
+   auf den Ziffern der Uhr. Sie bekommt nur die duenne Schneedecke, ohne Bogen. */
+body.anlass-weihnachten .unterleiste > .card::before { background: none; border-top-width: 0.4vh; }
+
+/* --- Die Karten: sechs Festfarben, jede mit ihrem Muster. Hier IST Farbe Flaeche -- die zweite
+   ausdrueckliche Ausnahme von ADR 0004 neben der Statusseite. Reihum nach der Stelle im Raster,
+   damit keine zwei Nachbarn gleich aussehen; sechs Farben bei vier Spalten verschieben sich von
+   Zeile zu Zeile von selbst.
+
+   Fotos, Radar und Media Player bringen ihr eigenes Bild mit und bleiben, wie sie sind. */
+body.anlass-weihnachten .card:nth-child(6n+1) { --wf1: #e02e44; --wf2: #a3142a;
+  --wm: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72'%3E%3Cg stroke='white' stroke-opacity='.17' stroke-width='1.8' stroke-linecap='round'%3E%3Cpath d='M18 7v22M8.5 12.5l19 11M8.5 23.5l19-11'/%3E%3Cpath d='M54 43v22M44.5 48.5l19 11M44.5 59.5l19-11'/%3E%3C/g%3E%3Cg fill='white' fill-opacity='.17'%3E%3Ccircle cx='54' cy='14' r='2.2'/%3E%3Ccircle cx='18' cy='52' r='2.2'/%3E%3C/g%3E%3C/svg%3E"); }
+body.anlass-weihnachten .card:nth-child(6n+2) { --wf1: #22a565; --wf2: #0f6338;
+  --wm: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72'%3E%3Cg fill='%23ffd166' fill-opacity='.34'%3E%3Cpath d='M18 6l3 9 9 3-9 3-3 9-3-9-9-3 9-3z'/%3E%3Cpath d='M54 40l2.4 7.2 7.2 2.4-7.2 2.4L54 59.2l-2.4-7.2-7.2-2.4 7.2-2.4z'/%3E%3C/g%3E%3Cg fill='white' fill-opacity='.22'%3E%3Ccircle cx='50' cy='14' r='1.8'/%3E%3Ccircle cx='16' cy='50' r='1.8'/%3E%3C/g%3E%3C/svg%3E"); }
+body.anlass-weihnachten .card:nth-child(6n+3) { --wf1: #f0a321; --wf2: #c2740c;
+  --wm: repeating-linear-gradient(135deg, rgba(255,255,255,0.10) 0 1.3vh, transparent 1.3vh 2.6vh); }
+body.anlass-weihnachten .card:nth-child(6n+4) { --wf1: #2f72e6; --wf2: #183f9c;
+  --wm: radial-gradient(circle, rgba(255,255,255,0.24) 0 0.32vh, transparent 0.38vh) 0 0 / 3.4vh 3.4vh,
+        radial-gradient(circle, rgba(255,255,255,0.16) 0 0.22vh, transparent 0.28vh) 1.7vh 1.7vh / 3.4vh 3.4vh; }
+body.anlass-weihnachten .card:nth-child(6n+5) { --wf1: #b04bd6; --wf2: #6f2591;
+  --wm: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='72' height='72'%3E%3Cg fill='white' fill-opacity='.2'%3E%3Cpath d='M18 6l3 9 9 3-9 3-3 9-3-9-9-3 9-3z'/%3E%3Cpath d='M54 40l2.4 7.2 7.2 2.4-7.2 2.4L54 59.2l-2.4-7.2-7.2-2.4 7.2-2.4z'/%3E%3Ccircle cx='50' cy='14' r='1.8'/%3E%3Ccircle cx='16' cy='50' r='1.8'/%3E%3C/g%3E%3C/svg%3E"); }
+body.anlass-weihnachten .card:nth-child(6n+6) { --wf1: #17a3b4; --wf2: #0b6676;
+  --wm: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='40'%3E%3Cg fill='none' stroke='white' stroke-opacity='.17' stroke-width='2.4'%3E%3Cpath d='M0 14l12-10 12 10 12-10 12 10'/%3E%3Cpath d='M0 34l12-10 12 10 12-10 12 10'/%3E%3C/g%3E%3Cg fill='white' fill-opacity='.17'%3E%3Ccircle cx='12' cy='16' r='1.6'/%3E%3Ccircle cx='36' cy='16' r='1.6'/%3E%3C/g%3E%3C/svg%3E"); }
+
+body.anlass-weihnachten .card:not(.type-photo):not(.type-radar):not(.type-media_player):not(.card-on-photo) {
+  background: var(--wm, none), linear-gradient(158deg, var(--wf1, #e02e44) 0%, var(--wf2, #a3142a) 100%);
+  /* Der Zuckergussrand, und innen eine gestickte Naht wie an einem Filzanhaenger. */
+  border: 0.3vh solid rgba(255,255,255,0.92);
+  outline: 0.16vh dashed rgba(255,255,255,0.5); outline-offset: -0.85vh;
+  box-shadow: 0 0.9vh 2.2vh rgba(0,0,0,0.42) !important;
+  -webkit-backdrop-filter: none; backdrop-filter: none;
+  --text: #ffffff; --muted: rgba(255,255,255,0.86);
+  color: #fff;
+}
+/* Die Energiekarte bleibt NACHTBLAU, an jeder Stelle im Raster. Ihre Knoten tragen Farben, die
+   etwas sagen (Solar gelb, Netz rot, Haus violett) -- auf Rot oder Gold waeren sie nicht mehr zu
+   lesen, in der Gesamtvorschau gesehen. Schnee und Naht bekommt sie trotzdem. */
+body.anlass-weihnachten .card.type-energy {
+  --wf1: #1b2a66; --wf2: #0d1538;
+  --wm: radial-gradient(circle, rgba(255,255,255,0.22) 0 0.28vh, transparent 0.34vh) 0 0 / 3.4vh 3.4vh,
+        radial-gradient(circle, rgba(255,255,255,0.14) 0 0.2vh, transparent 0.26vh) 1.7vh 1.7vh / 3.4vh 3.4vh;
+}
+
+/* --- Schrift und Aufbau. "Schriftart, Schriftfarbe, gesamtes Layout kannst du auch ein anderes
+   hernehmen" -- also bekommt Weihnachten seine eigene Schrift (Mountains of Christmas, fett,
+   mitgeliefert, siehe schriften/HERKUNFT.md) und einen eigenen Kartenaufbau:
+
+     - Das SYMBOL sitzt in einer weissen Scheibe, in der Farbe der Karte -- wie eine Kugel am Baum.
+     - Der WERT steht in der Weihnachtsschrift, cremeweiss mit Schatten.
+     - Der NAME ist ein Geschenkanhaenger: weisse Pille, Schrift in der Kartenfarbe.
+
+   Auf einer bunten Flaeche traegt der Akzent des Kartentyps nicht mehr (ein orangefarbenes
+   Thermometer auf Rot ist ein Fleck); er bleibt dort, wo er etwas SAGT -- Regler, Aktiv-Schein,
+   Tonnenfarbe. */
+@font-face {
+  font-family: 'Panel Weihnachten';
+  src: url('schriften/MountainsofChristmas-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: block;
+  /* OHNE die Ziffern. Die Schrift hat Mediaevalziffern: Ihre Null ist ein kleines "o", und auf
+     der Karte stand "1oo.5 L" und "15:oo" -- in der Probe gesehen. Auf einer Anzeige, die man
+     wegen ihrer Zahlen ansieht, geht das nicht. Die Ziffern kommen deshalb aus der naechsten
+     Schrift in der Liste, der mitgelieferten Handschrift: kraeftig, verspielt, und eine Null
+     ist dort eine Null. Punkt, Komma, Doppelpunkt, Plus und Minus gehen mit: Zwischen zwei
+     kraeftigen Ziffern verschwand der feine Punkt, aus "02.12." wurde "0212". Der Schraegstrich
+     (U+002F) bleibt -- er steht in Einheiten wie "km/h" zwischen Buchstaben. */
+  unicode-range: U+0000-002A, U+002F, U+003B-FFFF;
+}
+body.anlass-weihnachten .card .value,
+body.anlass-weihnachten .card .gauge-value,
+body.anlass-weihnachten .card.type-waste .waste-tag,
+body.anlass-weihnachten .card.type-clock .clock-time {
+  font-family: 'Panel Weihnachten', 'Panel Handschrift', 'Segoe UI', system-ui, sans-serif;
+  font-weight: 700; letter-spacing: 0.015em;
+  color: #fffbe9; text-shadow: 0 0.25vh 0.5vh rgba(0,0,0,0.32);
+}
+/* Die Schrift laeuft kleiner als Segoe UI: gleiche Punktgroesse heisst nicht gleiche Hoehe. */
+body.anlass-weihnachten .card .value { font-size: clamp(2.1vh, 26cqmin, 12vh); line-height: 1.05; }
+body.anlass-weihnachten .card.type-clock .clock-time { font-size: clamp(2.4vh, 30cqmin, 15vh); }
+body.anlass-weihnachten .card .gauge-value { font-size: clamp(1.8vh, 24cqmin, 9.5vh); }
+body.anlass-weihnachten .card .badge { font-weight: 600; }
+
+body.anlass-weihnachten .card:not(.type-photo):not(.type-radar):not(.type-media_player) .row > .icon {
+  width: clamp(2.6vh, 20cqmin, 5.8vh); height: clamp(2.6vh, 20cqmin, 5.8vh);
+  box-sizing: border-box; padding: clamp(0.35vh, 3.2cqmin, 0.9vh);
+  background: #fff; border-radius: 50%;
+  color: var(--wf2, #a3142a); opacity: 1;
+  box-shadow: 0 0.25vh 0.5vh rgba(0,0,0,0.25);
+}
+body.anlass-weihnachten .card:not(.type-photo):not(.type-radar):not(.type-media_player) .badge {
+  color: #fff; border-color: rgba(255,255,255,0.7); }
+body.anlass-weihnachten .card .mini-verlauf { color: #fff; }
+body.anlass-weihnachten .card:not(.type-photo):not(.type-radar):not(.type-media_player) > .name {
+  align-self: flex-start; max-width: 100%; box-sizing: border-box;
+  background: rgba(255,255,255,0.95); color: var(--wf2, #a3142a);
+  font-weight: 700; letter-spacing: 0.01em;
+  padding: 0.2vh 1.1vh 0.3vh; border-radius: 999px;
+  box-shadow: 0 0.2vh 0.4vh rgba(0,0,0,0.22);
+}
+body.anlass-weihnachten .card .ort-silhouette { opacity: 0.17; }
+/* Ein Tor, das zu lange braucht, faerbt sich rot -- auf einer roten Karte saehe man es nicht.
+   Die Warnung bekommt deshalb eine dunkle Karte, auf der Rot leuchtet. */
+body.anlass-weihnachten .card.tor-ueberfaellig { --wf1: #3a0d16; --wf2: #16060a; }
+
+/* --- Schneehauben: Auf jeder Karte liegt Schnee. Die Lichtkante oben (.card::before) wird zur
+   Schneedecke, darunter haengen zwei Reihen ungleich grosser Bogen -- eine Reihe allein sieht
+   aus wie eine Borte, zwei mit verschiedenem Takt wie Schnee. Die Haube liegt unter dem Inhalt
+   (.card > * hat z-index 1). */
+body.anlass-weihnachten .card::before {
+  opacity: 1;
+  border-top: 0.6vh solid #fff;
+  border-left: none;
+  background:
+    radial-gradient(ellipse 50% 100% at 50% 0, #fff 0 97%, transparent 100%) 0.8vh 0 / 5.4vh 1.15vh repeat-x,
+    radial-gradient(ellipse 50% 100% at 50% 0, #fff 0 97%, transparent 100%) 3.1vh 0 / 8.6vh 1.75vh repeat-x;
+  filter: drop-shadow(0 0.2vh 0.2vh rgba(0,0,0,0.18));
+}
+
+/* --- Die Schicht selbst. */
+.anlass-schicht {
+  position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden;
+}
+.bildschirmschoner > .anlass-schicht { position: absolute; z-index: 3; }
+.anlass-schicht.anlass-leer { display: none; }
+.bildschirmschoner.bs-sichtbar ~ .anlass-schicht .anlass-bewegt,
+.bildschirmschoner:not(.bs-sichtbar) > .anlass-schicht .anlass-bewegt { animation-play-state: paused; }
+
+/* --- Die Tannengirlande. Das Gruen ist ein gestrecktes SVG in vier Lagen: dunkler Kern, zwei
+   gestrichelte Lagen als Nadeln, darauf Schneetupfer. Die Strichstaerke steht in vh und mit
+   non-scaling-stroke -- sonst wuerde sie mit dem Bild in die Breite gezogen. */
+.anlass-girlande { position: absolute; left: 0; right: 0; top: -0.3vh; height: 6.4vh; }
+.anlass-gruen { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+.anlass-gruen path { fill: none; vector-effect: non-scaling-stroke; }
+.anlass-gruen .g1 { stroke: #0e4a2a; stroke-width: 2.5vh; stroke-linecap: round; }
+.anlass-gruen .g2 { stroke: #1b7c46; stroke-width: 3.1vh; stroke-dasharray: 3 5; }
+.anlass-gruen .g3 { stroke: #37a868; stroke-width: 2vh; stroke-dasharray: 2 7; stroke-dashoffset: 4; }
+.anlass-gruen .g4 { stroke: rgba(255,255,255,0.85); stroke-width: 0.9vh; stroke-dasharray: 1.5 13; stroke-linecap: round; }
+
+.anlass-schleife { position: absolute; top: -0.5vh; width: 5.2vh; margin-left: -2.6vh; }
+.anlass-schleife svg { width: 100%; display: block; filter: drop-shadow(0 0.3vh 0.4vh rgba(0,0,0,0.3)); }
+
+/* Die Lichter auf den Boegen. Vier Takte, damit nicht alle zugleich atmen. */
+.anlass-birne {
+  position: absolute; width: 1.2vh; height: 1.7vh; margin: 0.1vh 0 0 -0.6vh;
+  border-radius: 50% 50% 50% 50% / 36% 36% 64% 64%;
+  background: var(--birne);
+  box-shadow: 0 0 1.5vh 0.35vh var(--birne), inset 0.2vh 0.25vh 0.3vh rgba(255,255,255,0.6);
+  will-change: opacity;
+  animation: anlass-funkeln 3.6s ease-in-out infinite;
+}
+.anlass-birne.b1 { animation-delay: -0.9s; }
+.anlass-birne.b2 { animation-delay: -1.8s; }
+.anlass-birne.b3 { animation-delay: -2.7s; }
+@keyframes anlass-funkeln { 0%, 100% { opacity: 1; } 50% { opacity: 0.36; } }
+
+/* Die Anhaenger: Kugel, Stern, Zuckerstange, Glocke -- jeder an seinem Faden, jeder pendelt in
+   seinem eigenen Takt um den Aufhaengepunkt. */
+.anlass-haenger {
+  position: absolute; width: var(--gr); margin: 0.5vh 0 0 calc(var(--gr) / -2);
+  display: flex; flex-direction: column; align-items: center;
+  transform-origin: 50% 0; will-change: transform;
+  animation: anlass-pendeln var(--pd, 3.4s) ease-in-out var(--pv, 0s) infinite alternate;
+}
+.anlass-faden { display: block; width: 1px; height: var(--faden); background: rgba(255,255,255,0.75); }
+.anlass-haenger svg { width: 100%; display: block; filter: drop-shadow(0 0.3vh 0.5vh rgba(0,0,0,0.36)); }
+@keyframes anlass-pendeln { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
+
+/* --- Schnee. Ort, Groesse, Dauer und Drift kommen je Flocke aus anlass.js (einmal, beim
+   Aufbau). Drei Tiefen: fern klein und langsam, nah gross und schnell. */
+.anlass-flocke {
+  position: absolute; top: -3vh; width: var(--gr); height: var(--gr); border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.9) 48%, rgba(255,255,255,0) 74%);
+  opacity: var(--dk); will-change: transform;
+  animation: anlass-fallen var(--dauer) linear var(--versatz) infinite;
+}
+@keyframes anlass-fallen {
+  0%   { transform: translate3d(0, 0, 0); }
+  50%  { transform: translate3d(var(--drift), 53vh, 0); }
+  100% { transform: translate3d(calc(var(--drift) * -0.4), 106vh, 0); }
+}
+
+/* --- Der Schlitten. Ein Flug dauert rund ein Achtel des Takts, den Rest wartet er rechts
+   ausserhalb des Bildes. `backwards` haelt ihn vor dem ersten Flug links draussen. */
+.anlass-schlitten {
+  position: absolute; left: 0; top: 11vh; width: 46vh; will-change: transform;
+  animation: anlass-flug var(--anlass-takt-schlitten, 150s) linear 9s infinite backwards;
+}
+.anlass-schlitten svg { width: 100%; display: block; overflow: visible;
+  filter: drop-shadow(0 0.4vh 0.8vh rgba(0,0,0,0.38)); }
+.anlass-schlitten-wippe { animation: anlass-wippen 1.7s ease-in-out infinite alternate; will-change: transform; }
+@keyframes anlass-flug {
+  0%        { transform: translate3d(-50vh, 9vh, 0) rotate(-7deg); }
+  6.5%      { transform: translate3d(48vw, 0, 0) rotate(-2deg); }
+  13%, 100% { transform: translate3d(calc(100vw + 6vh), 8vh, 0) rotate(6deg); }
+}
+@keyframes anlass-wippen { from { transform: translate3d(0, -0.7vh, 0); } to { transform: translate3d(0, 0.7vh, 0); } }
+.anlass-nase { transform-box: fill-box; transform-origin: center;
+  animation: anlass-nase 0.9s ease-in-out infinite alternate; }
+@keyframes anlass-nase { from { transform: scale(0.8); opacity: 0.75; } to { transform: scale(1.35); opacity: 1; } }
+.anlass-funke { animation: anlass-funke 1.2s ease-in-out infinite alternate; }
+.anlass-funke.f2 { animation-delay: -0.5s; }
+.anlass-funke.f3 { animation-delay: -0.9s; }
+@keyframes anlass-funke { from { opacity: 0.15; } to { opacity: 1; } }
+
+/* --- Wer hinter dem Schnee hervorschaut. Auf dem Dashboard (kleine Szene) kommen Figur und
+   Adventskranz abwechselnd, um einen halben Takt versetzt; in der grossen Szene steht der Kranz
+   fest, und nur die Figur taucht auf. */
+.anlass-ecke {
+  position: absolute; bottom: 0; will-change: transform;
+  transform: translate3d(0, 130%, 0);
+  animation: anlass-auftauchen var(--anlass-takt-ecke, 120s) ease-in-out infinite backwards;
+}
+.anlass-ecke svg { width: 100%; display: block; overflow: visible;
+  filter: drop-shadow(0 0.4vh 1vh rgba(0,0,0,0.38)); }
+.anlass-figur { right: 3.2vw; width: 19vh; animation-delay: 22s; }
+.anlass-gross .anlass-figur { width: 15.5vh; right: 2.6vw; bottom: 0.6vh; }
+.anlass-kranz { left: 3.2vw; bottom: 1.8vh; width: 22vh; animation-name: anlass-kranz;
+  animation-delay: calc(22s + var(--anlass-takt-ecke, 120s) / 2); }
+@keyframes anlass-auftauchen {
+  0%          { transform: translate3d(0, 130%, 0) rotate(4deg); }
+  2.6%        { transform: translate3d(0, 6%, 0) rotate(-3deg); }
+  3.6%, 8.4%  { transform: translate3d(0, 11%, 0) rotate(0deg); }
+  10.6%, 100% { transform: translate3d(0, 130%, 0) rotate(4deg); }
+}
+/* Der Kranz steht hoeher als die Figur: Bei ihr darf der Bart im Schnee stecken, beim Kranz
+   waere genau das Gruen weg, an dem man ihn erkennt. */
+@keyframes anlass-kranz {
+  0%          { transform: translate3d(0, 130%, 0); }
+  2.8%, 11%   { transform: translate3d(0, 0, 0); }
+  13.4%, 100% { transform: translate3d(0, 130%, 0); }
+}
+.anlass-winken { transform-box: view-box; transform-origin: 15px 104px;
+  animation: anlass-winken 0.62s ease-in-out infinite alternate; }
+@keyframes anlass-winken { from { transform: rotate(-13deg); } to { transform: rotate(15deg); } }
+.anlass-figur[data-figur="nikolaus"] .anlass-winken { transform-origin: 14px 128px;
+  animation-name: anlass-stab; animation-duration: 1.5s; }
+@keyframes anlass-stab { from { transform: rotate(-4deg); } to { transform: rotate(5deg); } }
+.anlass-flamme { transform-box: fill-box; transform-origin: 50% 100%;
+  animation: anlass-flackern 0.9s ease-in-out infinite alternate; }
+.anlass-flamme.fl1 { animation-duration: 1.15s; }
+.anlass-flamme.fl2 { animation-duration: 0.75s; }
+@keyframes anlass-flackern { from { transform: scale(0.9, 0.86) skewX(-4deg); } to { transform: scale(1.06, 1.1) skewX(4deg); } }
+
+/* --- Der Schnee am unteren Rand: zwei Huegelketten. Er liegt VOR allem, was dahinter steht
+   oder auftaucht. Auf dem Dashboard flach: Dort steht ganz unten der Streifen mit der Uhr, und
+   mit 3,4vh ragte der Schnee in die Ziffern -- auf der Live-Ansicht des Panels gesehen. */
+.anlass-wehe { position: absolute; left: 0; right: 0; bottom: 0; height: 2.1vh; }
+.anlass-wehe svg { width: 100%; height: 100%; display: block; }
+.anlass-wehe .wehe-hinten { fill: #cfe0f5; }
+.anlass-wehe .wehe-vorn { fill: #ffffff; }
+.anlass-gross .anlass-wehe { height: 4.2vh; }
+
+/* --- Die Winterszene auf dem Schoner. Von links: Baum, Geschenke, Schild, Adventskranz,
+   Haeuschen, Schneemann -- und rechts taucht ab und zu jemand auf. Lagen in vw (damit sich die
+   Dinge ueber die Breite verteilen), Groessen in vh (damit sie zur Kartenhoehe passen). */
+.anlass-szene { position: absolute; left: 0; right: 0; bottom: 0; height: 17vh; }
+.anlass-ding { position: absolute; bottom: 1.9vh; }
+.anlass-ding svg { width: 100%; display: block; overflow: visible;
+  filter: drop-shadow(0 0.4vh 0.8vh rgba(0,0,0,0.34)); }
+.anlass-baum { left: 1.4vw; width: 10.4vh; bottom: 2.6vh; }
+.anlass-geschenke { left: 9.2vw; width: 13vh; bottom: 3.2vh; }
+.anlass-kranzplatz { left: 38vw; width: 14.4vh; bottom: 3vh; }
+.anlass-haus { left: 54.5vw; width: 16.6vh; bottom: 2.9vh; }
+.anlass-schneemann { left: 72.5vw; width: 9.8vh; bottom: 2.9vh; }
+
+/* Das Holzschild zaehlt die Tage. Schneehaube oben, Pfosten unten -- der Pfosten verschwindet
+   im Schnee davor. */
+.anlass-schild {
+  left: 20.5vw; bottom: 6.6vh; min-width: 15vh; padding: 0.9vh 1.5vh 0.8vh; text-align: center;
+  color: #fff6e2; background: linear-gradient(180deg, #b47a45 0%, #8d5a31 100%);
+  border: 0.25vh solid #6c4324; border-radius: 0.9vh;
+  box-shadow: 0 0.5vh 1vh rgba(0,0,0,0.36), inset 0 0.2vh 0 rgba(255,255,255,0.18);
+  font-family: 'Panel Weihnachten', 'Panel Handschrift', 'Segoe UI', system-ui, sans-serif;
+  white-space: nowrap;
+}
+.anlass-schild b { display: block; font-size: 3.1vh; line-height: 1.05; font-weight: 700; }
+.anlass-schild small { display: block; font-size: 1.5vh; line-height: 1.2; opacity: 0.92; }
+.anlass-schild::before {
+  content: ''; position: absolute; left: -0.5vh; right: -0.5vh; top: -0.9vh; height: 1.5vh;
+  background: #fff; border-radius: 0.9vh 0.9vh 0.6vh 0.6vh;
+}
+.anlass-schild::after {
+  content: ''; position: absolute; left: 50%; top: 100%; width: 1.3vh; height: 6vh; margin-left: -0.65vh;
+  background: linear-gradient(90deg, #7a4b2a, #92603a); z-index: -1;
+}
+
+/* Was sich in der Szene bewegt: die Lichter am Baum, sein Stern, der Rauch aus dem Kamin, das
+   Licht in den Fenstern, der Arm des Schneemanns. Alles klein und alles langsam. */
+.anlass-baumlicht { animation: anlass-funkeln 2.8s ease-in-out infinite; }
+.anlass-baumlicht.b1 { animation-delay: -0.7s; }
+.anlass-baumlicht.b2 { animation-delay: -1.4s; }
+.anlass-baumlicht.b3 { animation-delay: -2.1s; }
+.anlass-stern { transform-box: fill-box; transform-origin: center;
+  animation: anlass-stern 2.2s ease-in-out infinite alternate; }
+@keyframes anlass-stern { from { transform: scale(0.92) rotate(-4deg); } to { transform: scale(1.12) rotate(4deg); } }
+.anlass-rauch { transform-box: fill-box; transform-origin: center; opacity: 0;
+  animation: anlass-rauch 4.2s ease-out infinite; }
+.anlass-rauch.r2 { animation-delay: 1.4s; }
+.anlass-rauch.r3 { animation-delay: 2.8s; }
+@keyframes anlass-rauch {
+  0%   { opacity: 0;    transform: translate(0, 2px) scale(0.5); }
+  15%  { opacity: 0.85; }
+  100% { opacity: 0;    transform: translate(7px, -22px) scale(1.7); }
+}
+.anlass-fenster { animation: anlass-fenster 3.4s ease-in-out infinite alternate; }
+@keyframes anlass-fenster { from { opacity: 0.72; } to { opacity: 1; } }
+.anlass-arm { transform-box: view-box; transform-origin: 66px 70px;
+  animation: anlass-arm 0.9s ease-in-out infinite alternate; }
+@keyframes anlass-arm { from { transform: rotate(-9deg); } to { transform: rotate(12deg); } }
+
+/* --- Ohne Bewegung bleibt, was stillsteht: bunte Karten, Schneehauben, Girlande, Szene.
+   Schnee, Schlitten und die Gaeste gibt es nur bewegt -- stehende Flocken waeren Flecken. */
+body.ohne-bewegung .anlass-schnee, body.ohne-bewegung .anlass-schlitten, body.ohne-bewegung .anlass-ecke { display: none; }
+body.ohne-bewegung .anlass-bewegt { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .anlass-schnee, .anlass-schlitten, .anlass-ecke { display: none; }
+  .anlass-bewegt { animation: none !important; }
+}

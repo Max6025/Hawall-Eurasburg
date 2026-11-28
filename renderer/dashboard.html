@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Wall Display</title>
 <link rel="stylesheet" href="shared/dashboard.css">
+<link rel="stylesheet" href="shared/anlass.css">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 </head>
@@ -1035,18 +1036,27 @@ function anlassAnwenden(erzwingen) {
   if (!erzwingen && z.signatur === anlassSignatur && (innen || !z.anlass)) return;
   anlassSignatur = z.signatur;
   document.body.classList.toggle('anlass-weihnachten', z.anlass === 'weihnachten');
-  AnlassModul.schichtSetzen($('anlassSchicht'), z, { flocken: 36 });
+  // Ueber dem Dashboard die kleine Szene (unten steht der Streifen mit der Uhr), im Schoner
+  // die grosse: Baum, Geschenke, Schild, Kranz, Haeuschen, Schneemann.
+  AnlassModul.schichtSetzen($('anlassSchicht'), z, { flocken: 36, szene: 'klein' });
   if (!innen) { innen = document.createElement('div'); bs.appendChild(innen); }
-  AnlassModul.schichtSetzen(innen, z, { flocken: 48 });
+  AnlassModul.schichtSetzen(innen, z, { flocken: 48, szene: 'gross' });
   if (schoner) schoner.farbenSetzen(z.anlass === 'weihnachten' ? AnlassModul.BUEHNE_TOENE_WEIHNACHTEN : null);
+  // Hell/Dunkel haengt am Anlass: Zu Weihnachten gibt es kein helles Glas-Design.
+  applyTheme();
 }
 
+// Zu Weihnachten gibt es KEIN helles Design: Die Karten sind deckend bunt und tragen immer
+// weisse Schrift -- mit light-theme kaeme dunkle Schrift auf Rot. Der Sonnenstand schaltet dann
+// nur den Himmel dahinter (anlass-tag), nicht das Farbschema.
 function applyTheme() {
-  if (!config || !config.sunEntity) { document.body.classList.remove('light-theme'); return; }
+  const weihnachten = document.body.classList.contains('anlass-weihnachten');
+  if (!config || !config.sunEntity) { document.body.classList.remove('light-theme', 'anlass-tag'); return; }
   const s = statesById[config.sunEntity];
-  if (!s) return;
+  if (!s) { if (weihnachten) document.body.classList.remove('light-theme'); return; }
   const isDay = s.state === 'above_horizon' || s.state === 'on';
-  document.body.classList.toggle('light-theme', isDay);
+  document.body.classList.toggle('light-theme', isDay && !weihnachten);
+  document.body.classList.toggle('anlass-tag', isDay && weihnachten);
 }
 
 // --- Ankuendigungs-Box: bei Inhalt in der konfigurierten input_text-Entitaet wird alles
