@@ -307,15 +307,15 @@ test('Jede Bewegung aendert nur transform und opacity', () => {
   }
 });
 
-test('Ein Schlagschatten haengt nur an einem stehenden SVG, nie an etwas Bewegtem', () => {
-  // Ein Filter auf einem Element, in dem sich etwas bewegt, wird fuer jedes Bild neu gerechnet.
+test('Im Weihnachtsblatt gibt es keinen Filter und keine Maske', () => {
+  // Ein Filter ist eine eigene Zeichenrunde der Grafikeinheit. Der Schnee laesst das ganze Bild
+  // in jedem Bild neu zeichnen -- also liefe jede dieser Runden sechzigmal in der Sekunde.
   const css = ohneKommentare(lies('renderer/shared/anlass.css'));
-  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if (!/(^|[;\s])filter\s*:/.test(m[2])) continue;
-    for (const sel of m[1].split(',')) {
-      assert.match(sel.trim(), /svg$/, `Filter ausserhalb eines stehenden SVG: ${sel.trim()}`);
-    }
+  for (const m of css.matchAll(/filter\s*:\s*([^;}]+)/g)) {
+    assert.strictEqual(m[1].trim(), 'none', `ein Filter im Weihnachtsblatt: ${m[0]}`);
   }
+  assert.ok(!/mask(-image)?\s*:/.test(css), 'eine Maske im Weihnachtsblatt');
+  assert.ok(!/mix-blend-mode/.test(css), 'ein Mischmodus im Weihnachtsblatt');
   // Und die grossen weichgezeichneten Flaechen des Alltags sind zu Weihnachten aus.
   assert.match(css, /body\.anlass-weihnachten \.lebendig \{ display: none; \}/);
   assert.match(css, /body\.anlass-weihnachten \.bs-buehne \{ display: none; \}/);

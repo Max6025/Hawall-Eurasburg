@@ -1488,12 +1488,46 @@ function befehleEmpfangen() {
     if (befehl && befehl.befehl === 'ton') akkuTonSpielen(true);
     // "Weihnachtston auf der Wand abspielen": der Schlitten fliegt einmal vorbei, mit Schellen --
     // auch wenn gerade der Schoner liegt, denn wer den Knopf drueckt, will es hoeren.
+    if (befehl && befehl.befehl === 'bildrate') bildrateMessen(befehl.sekunden);
     if (befehl && befehl.befehl === 'anlass-ton') {
       const gaeste = (schoner && schoner.istSichtbar()) ? anlassGaeste.schoner : anlassGaeste.vorn;
       if (gaeste) gaeste.auftreten('schlitten');
       anlassTonSpielen('schlitten', { ton: 'schellen', dauer: 8, richtung: 1 }, true);
     }
   };
+}
+
+// --- Bildrate nachmessen ------------------------------------------------------------------------
+//
+// "Fluessig" ist eine Zahl. Auf Befehl (POST /api/anzeige/bildrate) zaehlt die Anzeige ihre
+// Bilder: Jeder Aufruf von requestAnimationFrame ist ein Bild, das der Browser zeichnen wollte;
+// der Abstand zum vorigen sagt, ob dazwischen eines ausgefallen ist. Gemessen wird nur auf
+// Befehl -- die Schleife selbst laesst den Hauptstrang in jedem Bild einmal laufen, und das soll
+// im Dauerbetrieb niemand bezahlen.
+function bildrateMessen(sekunden) {
+  const dauer = Math.max(2, Math.min(30, Number(sekunden) || 8)) * 1000;
+  let bilder = 0, laengste = 0, ausgefallen = 0, zuletzt = 0, start = 0;
+  const schritt = (t) => {
+    if (!start) { start = t; zuletzt = t; }
+    else {
+      const luecke = t - zuletzt;
+      bilder++;
+      if (luecke > laengste) laengste = luecke;
+      // Bei 60 Bildern liegt eines alle 16,7 ms. Ab dem Anderthalbfachen fehlt mindestens eines.
+      if (luecke > 25) ausgefallen += Math.round(luecke / 16.7) - 1;
+      zuletzt = t;
+    }
+    if (t - start < dauer) { requestAnimationFrame(schritt); return; }
+    fetch(`${API}/api/geraet/bildrate`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bilderProSekunde: Math.round(bilder / ((t - start) / 1000) * 10) / 10,
+        laengsteLueckeMs: Math.round(laengste), ausgefallen, sekunden: Math.round((t - start) / 100) / 10,
+        schonerLiegt: !!(schoner && schoner.istSichtbar()), bewegungen: document.getAnimations().length
+      })
+    }).catch(() => {});
+  };
+  requestAnimationFrame(schritt);
 }
 
 // --- Akkustand weitermelden --------------------------------------------------------------------

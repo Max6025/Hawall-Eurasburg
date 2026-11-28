@@ -285,6 +285,35 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     res.json({ ok: true, anzeigen: anzeigeHoerer.size });
   });
 
+  // --- Bildrate nachmessen ---------------------------------------------------------------------
+  //
+  // "Fluessig" ist eine Zahl, und die laesst sich nur am Geraet lesen. Auf Befehl zaehlt die
+  // Anzeige ein paar Sekunden lang ihre Bilder und meldet: wie viele pro Sekunde, die laengste
+  // Luecke, wie viele Bilder ausgefallen sind. Derselbe Weg wie beim Ton-Test.
+  let bildrateErgebnis = null;
+  app.post('/api/anzeige/bildrate', (req, res) => {
+    bildrateErgebnis = null;
+    const sekunden = Math.max(2, Math.min(30, parseInt((req.body || {}).sekunden, 10) || 8));
+    const zeile = 'data: ' + JSON.stringify({ befehl: 'bildrate', sekunden }) + '\n\n';
+    for (const h of anzeigeHoerer) {
+      try { h.write(zeile); } catch (e) { anzeigeHoerer.delete(h); }
+    }
+    res.json({ ok: true, anzeigen: anzeigeHoerer.size, sekunden });
+  });
+  app.post('/api/geraet/bildrate', (req, res) => {
+    const b = req.body || {};
+    const zahl = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+    // Nur Zahlen und ein Wahrheitswert -- was von der Anzeige kommt, wird nicht ungeprueft
+    // durchgereicht.
+    bildrateErgebnis = {
+      bilderProSekunde: zahl(b.bilderProSekunde), laengsteLueckeMs: zahl(b.laengsteLueckeMs),
+      ausgefallen: zahl(b.ausgefallen), sekunden: zahl(b.sekunden), schonerLiegt: !!b.schonerLiegt,
+      bewegungen: zahl(b.bewegungen), gemessen: new Date().toISOString()
+    };
+    res.json({ ok: true });
+  });
+  app.get('/api/geraet/bildrate', (req, res) => res.json({ ok: true, ergebnis: bildrateErgebnis }));
+
   app.post('/api/geraet/ton-ergebnis', (req, res) => {
     const { zustand, fehler } = req.body || {};
     tonErgebnis = { zustand: String(zustand || ''), fehler: String(fehler || ''), zeit: Date.now() };

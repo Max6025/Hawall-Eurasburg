@@ -207,7 +207,7 @@ body.anlass-weihnachten .card::before {
 .anlass-gruen .g4 { stroke: rgba(255,255,255,0.85); stroke-width: 0.9vh; stroke-dasharray: 1.5 13; stroke-linecap: round; }
 
 .anlass-schleife { position: absolute; top: -0.5vh; width: 5.2vh; margin-left: -2.6vh; }
-.anlass-schleife svg { width: 100%; display: block; filter: drop-shadow(0 0.3vh 0.4vh rgba(0,0,0,0.3)); }
+.anlass-schleife svg { width: 100%; display: block; }
 
 /* Die Lichter auf den Boegen: 32 Birnen in VIER Gruppen. Jede Gruppe ist eine Ebene, die als
    Ganzes atmet; die Birnen darin stehen still und werden einmal gemalt, samt ihrem Schein. */
@@ -233,16 +233,19 @@ body.anlass-weihnachten .card::before {
   animation: anlass-pendeln var(--pd, 3.4s) ease-in-out var(--pv, 0s) infinite alternate;
 }
 .anlass-faden { display: block; width: 1px; height: var(--faden); background: rgba(255,255,255,0.75); }
-.anlass-haenger svg { width: 100%; display: block; filter: drop-shadow(0 0.3vh 0.5vh rgba(0,0,0,0.36)); }
+.anlass-haenger svg { width: 100%; display: block; }
 @keyframes anlass-pendeln { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
 
 /* --- Stehende Zeichnung, bewegte Teile. Jede Zeichnung ist ein Kasten: das SVG steht still,
-   was sich bewegt, liegt als eigenes HTML-Element in Prozent darueber (siehe anlass.js). Der
-   Schlagschatten haengt NUR am stehenden SVG -- ein Filter auf einem Element, in dem sich etwas
-   bewegt, muesste fuer jedes Bild neu gerechnet werden. */
+   was sich bewegt, liegt als eigenes HTML-Element in Prozent darueber (siehe anlass.js).
+
+   KEIN FILTER, NIRGENDS IN DIESEM BLATT. Bis 1.0.43 trugen die Zeichnungen einen Schlagschatten
+   (filter: drop-shadow). Ein Filter ist eine eigene Zeichenrunde der Grafikeinheit -- und weil
+   der Schnee das ganze Bild in jedem Bild neu zeichnen laesst, lief diese Runde fuer jede der
+   rund dreissig Zeichnungen sechzigmal in der Sekunde. Die Figuren sind flach und farbig; auf
+   den bunten Karten tragen sie auch ohne Schatten. */
 .anlass-bild { position: relative; display: block; width: 100%; }
-.anlass-bild > svg { display: block; width: 100%; overflow: visible;
-  filter: drop-shadow(0 0.4vh 0.8vh rgba(0,0,0,0.34)); }
+.anlass-bild > svg { display: block; width: 100%; overflow: visible; }
 .anlass-teil { position: absolute; display: block; will-change: transform, opacity; }
 .anlass-teil > svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .anlass-fleck { border-radius: 50%; }
