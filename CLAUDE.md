@@ -1576,13 +1576,29 @@ CSS-Animation. Der Zeitgeber läuft nur in der Schicht, die zu sehen ist
 Auftritt nach wenigen Sekunden: Wer das Panel antippt, steht eine Minute davor, dann liegt der
 Schoner wieder.
 
-**Geräusche nur auf dem Dashboard** (`tonSpielen()`, `anlassTonSpielen()`): Schlittenschellen
-zum Schlitten, ein Glockenspiel zum Weihnachtsmann, zwei Glöckchen zu Rudolf, ein Glitzern zur
-Sternschnuppe. Gewünscht war ausdrücklich: abschaltbar (`anlassTon`), und im Bildschirmschoner
-**still** — dort läuft nur die Bewegung. Die Schicht im Schoner hat deshalb gar keinen
-Ton-Rückruf. Gerechnet, nicht abgespielt (wie der Akku-Ton). **Ich kann sie nicht hören** —
-geprüft ist nur, dass sie erklingen, nicht übersteuern (Spitze 0,3) und rechtzeitig enden; ob
-sie *gefallen*, sagt nur der Knopf „Hier anhören" auf der Design-Seite.
+**Der Weihnachtsmann hat eine Stimme, und sie gehört zum Augenblick** (`spruchWaehlen()`,
+`anlassTonSpielen()`). Die erste Fassung der Geräusche (1.0.42) war ein Glockenspiel, das beim
+*Losfahren* der Figur klang — anderthalb Sekunden, bevor von ihr etwas zu sehen war. Die
+Rückmeldung: *„Ich möchte nicht, dass die Vorwarnung kommt … sondern wenn der Weihnachtsmann von
+unten kommt und winkt, dann kommt ho ho ho."* Ein Ton, der etwas ankündigt, ist ein Signalton;
+gewünscht war, dass die Figur **selbst** etwas von sich gibt. Vier Punkte:
+1. **Der Ton kommt, wenn zu sehen ist, was ihn macht** (`tonNach` je Auftritt): beim
+   Weihnachtsmann, wenn er oben ist und winkt. Legt sich der Schoner vorher hin, entfällt er.
+2. **Dreizehn aufgenommene Sprüche** (ElevenLabs, vom Nutzer erzeugt, `shared/toene/`). Welcher
+   fällt, hängt am Auftritt **und am Tag**: am 5./6. Dezember „Der Nikolaus ist da", an einem
+   Adventssonntag genau dieser Advent, an Heiligabend und im Januar das Passende, sonst
+   „Ho, ho, ho". „Frohe Weihnachten" erst ab dem 20. Dezember — Ende November wäre es ein
+   Versehen. Nie derselbe zweimal hintereinander.
+3. **Notbehelfe in dieser Reihenfolge**: fehlt die Datei, spricht die Sprachausgabe von Windows
+   („Microsoft Stefan"; die Stimmen müssen beim Aufbau vorgeladen werden, der erste Aufruf von
+   `getVoices()` ist leer), dann das Glockenspiel. Zwei Aufnahmen haben schon Glocken — dazu
+   kommen keine gerechneten Schellen.
+4. **Nur auf dem Dashboard**, abschaltbar (`anlassTon`); im Bildschirmschoner bleibt die Wand
+   still — die Schicht dort hat gar keinen Ton-Rückruf. Was zuletzt zu hören war, meldet
+   `POST /api/anzeige/zustand-pruefen` (`stimmeErgebnis`, etwa „gespielt: hohoho-1").
+
+**Ich kann nichts davon hören.** Geprüft sind Format, Dauer, Pegel und dass die Wiedergabe auf
+dem Panel bis zum Ende läuft — nicht, wie es klingt.
 
 **Die Ortszeichen haben eine Festfassung**: Auf dem Hausdach liegt Schnee (und im Fenster
 brennt Licht), statt der drehenden Sonne steht ein Schneemann im Schneefall. Beide Fassungen
@@ -1609,7 +1625,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-692 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+698 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

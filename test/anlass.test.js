@@ -543,3 +543,74 @@ test('Ho, ho, ho: tief, gemaechlich, und ohne Stimme lieber gar nicht', () => {
   const aufbau = seite.slice(seite.indexOf('function anlassAnwenden'), seite.indexOf('function anlassGaesteAnpassen'));
   assert.match(aufbau, /window\.speechSynthesis\.getVoices\(\)/, 'ohne Vorladen klingelt der erste Auftritt');
 });
+
+// --- Die aufgenommenen Sprueche -------------------------------------------------------------------
+//
+// Dreizehn MP3 mit der Stimme des Weihnachtsmanns (ElevenLabs, vom Nutzer erzeugt). Welcher
+// faellt, haengt am Auftritt und am Tag.
+
+test('Jeder Spruch hat seine Datei, und keine Datei liegt herum, die niemand spielt', () => {
+  const ordner = path.join(__dirname, '..', 'renderer', 'shared', 'toene');
+  const dateien = fs.readdirSync(ordner).filter(d => d.endsWith('.mp3')).map(d => d.replace(/\.mp3$/, '')).sort();
+  assert.deepStrictEqual(dateien, A.SPRUECHE.slice().sort());
+  for (const name of A.SPRUECHE) {
+    const groesse = fs.statSync(path.join(ordner, name + '.mp3')).size;
+    assert.ok(groesse > 8000 && groesse < 200000, `${name}.mp3 ist ${groesse} Bytes gross`);
+  }
+  for (const name of A.SPRUECHE_MIT_GLOCKEN) assert.ok(A.SPRUECHE.includes(name));
+});
+
+test('Der Spruch passt zum Tag: Nikolaus, Advent, Heiligabend, Neujahr -- sonst Ho, ho, ho', () => {
+  let n = 3;
+  const zufall = () => { n = (n * 9301 + 49297) % 233280; return n / 233280; };
+  const ziehen = (auftritt, d, mal) => { const s = new Set(); let z = ''; for (let i = 0; i < (mal || 300); i++) { z = A.spruchWaehlen(auftritt, d, z, zufall); s.add(z); } return s; };
+  const hat = (menge, ...namen) => namen.every(x => menge.has(x));
+  const nur = (menge, ...erlaubt) => [...menge].every(x => erlaubt.includes(x));
+
+  // Ein gewoehnlicher Tag Ende November: nur Ho, ho, ho -- kein "Frohe Weihnachten".
+  const alltag = ziehen('figur', tag(2026, 11, 30));
+  assert.ok(nur(alltag, 'hohoho-1', 'hohoho-2', 'hohoho-brav'), [...alltag].join());
+  assert.ok(hat(alltag, 'hohoho-1', 'hohoho-2'));
+  // Nikolaustag (2026 zugleich der zweite Advent): beides kommt vor.
+  const nikolaus = ziehen('figur', tag(2026, 12, 6));
+  assert.ok(hat(nikolaus, 'nikolaus', 'advent-2'), [...nikolaus].join());
+  assert.ok(!nikolaus.has('advent-1') && !nikolaus.has('advent-3'));
+  // Die vier Adventssonntage 2026 -- und kein Adventsgruss an einem Werktag.
+  for (const [t, m, nr] of [[29, 11, 1], [6, 12, 2], [13, 12, 3], [20, 12, 4]]) {
+    assert.strictEqual(A.adventssonntag(tag(2026, m, t)), nr);
+    assert.ok(ziehen('figur', tag(2026, m, t)).has('advent-' + nr), `advent-${nr} fehlt`);
+  }
+  assert.strictEqual(A.adventssonntag(tag(2026, 12, 7)), 0);
+  assert.ok(![...ziehen('figur', tag(2026, 12, 9))].some(x => x.startsWith('advent')));
+  // 2023 war der 24. ein Sonntag: vierter Advent UND Heiligabend.
+  assert.strictEqual(A.adventssonntag(tag(2023, 12, 24)), 4);
+  assert.ok(hat(ziehen('figur', tag(2023, 12, 24)), 'heiligabend', 'advent-4'));
+  // Heiligabend, Weihnachtstage, Neujahr.
+  assert.ok(ziehen('figur', tag(2026, 12, 24)).has('heiligabend'));
+  assert.ok(!ziehen('figur', tag(2026, 12, 23)).has('heiligabend'));
+  assert.ok(ziehen('figur', tag(2026, 12, 25)).has('hohoho-weihnachten'));
+  assert.ok(ziehen('figur', tag(2027, 1, 2)).has('neujahr'));
+  assert.ok(!ziehen('figur', tag(2026, 12, 10)).has('neujahr'));
+  // Der Schlitten hat seine eigenen zwei; was still ist, bleibt still.
+  assert.deepStrictEqual([...ziehen('schlitten', tag(2026, 12, 1))].sort(), ['schlitten-1', 'schlitten-2']);
+  assert.strictEqual(A.spruchWaehlen('rudolf', tag(2026, 12, 1), ''), '');
+  assert.strictEqual(A.spruchWaehlen('schnuppe', tag(2026, 12, 1), ''), '');
+  // Nie derselbe zweimal hintereinander.
+  let z = '';
+  for (let i = 0; i < 200; i++) { const neu = A.spruchWaehlen('figur', tag(2026, 12, 1), z, zufall); assert.notStrictEqual(neu, z); z = neu; }
+  // Alles, was gezogen werden kann, gibt es als Datei.
+  for (const d of [tag(2026, 11, 30), tag(2026, 12, 6), tag(2026, 12, 24), tag(2026, 12, 31), tag(2027, 1, 3)]) {
+    for (const a of ['figur', 'schlitten']) for (const s of ziehen(a, d, 120)) assert.ok(A.SPRUECHE.includes(s), `${s} hat keine Datei`);
+  }
+});
+
+test('Die Aufnahme zuerst, dann die Sprachausgabe, dann das Glockenspiel -- und zu Glocken keine Schellen', () => {
+  const seite = lies('renderer/dashboard.html');
+  const block = seite.slice(seite.indexOf('function anlassTonSpielen'), seite.indexOf('function applyTheme'));
+  assert.match(block, /AnlassModul\.spruchWaehlen\(name, new Date\(\), anlassSpruchZuletzt\)/);
+  assert.ok(block.indexOf('anlassSpruchSpielen(spruch') < block.indexOf('AnlassModul.hohoho('), 'die Aufnahme kommt vor dem Notbehelf');
+  assert.match(block, /SPRUECHE_MIT_GLOCKEN\.includes\(spruch\)\) anlassRechenton\('schellen'/);
+  assert.match(seite, /new Audio\('shared\/toene\/' \+ name \+ '\.mp3'\)/);
+  // Die Einstellungsseite spielt dieselben Dateien.
+  assert.match(lies('renderer/setup/theme.js'), /new Audio\('\/shared\/toene\/' \+ name \+ '\.mp3'\)/);
+});

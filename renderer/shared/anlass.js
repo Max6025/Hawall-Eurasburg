@@ -526,7 +526,7 @@
   // Gegenteil: "wenn der Weihnachtsmann von unten kommt und winkt, dann kommt ho ho ho". Also
   // erst, wenn er OBEN ist. Und er SAGT es (ton 'hohoho', siehe hohoho()), statt zu klingeln.
   const AUFTRITTE = {
-    schlitten:  { gewicht: 4, ton: 'schellen',   tonNach: 0.03 },  // er ist sofort im Bild
+    schlitten:  { gewicht: 4, ton: 'schellen',   tonNach: 0.16 },  // er ist ein Stück im Bild
     figur:      { gewicht: 3, ton: 'hohoho',     tonNach: 0.2 },   // oben angekommen, winkt
     rudolf:     { gewicht: 2, ton: 'gloeckchen', tonNach: 0.17 },  // der Kopf ist herein
     schnuppe:   { gewicht: 2, ton: '',           tonNach: 0 },     // eine Sternschnuppe ist still
@@ -730,6 +730,63 @@
     return { stimmen, ende };
   }
 
+  // --- Die Sprüche -------------------------------------------------------------------------------
+  //
+  // Der Weihnachtsmann hat eine STIMME: dreizehn aufgenommene Sprüche (ElevenLabs, vom Nutzer
+  // erzeugt und geliefert), als MP3 unter shared/toene/. Sie ersetzen die Sprachausgabe von
+  // Windows, die als Notbehelf bleibt (hohoho() weiter unten), falls eine Datei fehlt.
+  //
+  // Welcher Spruch fällt, hängt am Auftritt UND am Tag -- auch das ist Auskunft in der
+  // Bildsprache: Am 5. und 6. Dezember sagt er, dass er der Nikolaus ist; an einem
+  // Adventssonntag wünscht er genau diesen Advent; an Heiligabend frohe Weihnachten; im Januar
+  // ein frohes neues Jahr. An allen anderen Tagen ruft er Ho, ho, ho.
+  //
+  // In zwei Dateien läuten schon Glocken (das Tag [Glockenläuten] bei der Aufnahme). Zu denen
+  // kommen keine gerechneten Schellen dazu, sonst klingelt es doppelt.
+  const SPRUECHE = ['hohoho-1', 'hohoho-2', 'hohoho-weihnachten', 'hohoho-brav', 'schlitten-1', 'schlitten-2',
+    'nikolaus', 'heiligabend', 'neujahr', 'advent-1', 'advent-2', 'advent-3', 'advent-4'];
+  const SPRUECHE_MIT_GLOCKEN = ['schlitten-1', 'heiligabend'];
+
+  /** Ist HEUTE ein Adventssonntag? 0 oder 1..4. */
+  function adventssonntag(datum) {
+    const d = ALS_DATUM(datum);
+    const gestern = new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1);
+    const heute = adventStand(d);
+    return (d.getDay() === 0 && heute > adventStand(gestern)) ? heute : 0;
+  }
+
+  /**
+   * Welcher Spruch zu diesem Auftritt an diesem Tag? '' heißt: keiner (dann klingt, was der
+   * Auftritt sonst hat, oder nichts). Gewichtet gewürfelt, nie derselbe zweimal hintereinander.
+   */
+  function spruchWaehlen(auftritt, datum, zuletzt, zufall) {
+    const r = zufall || Math.random;
+    const d = ALS_DATUM(datum);
+    const m = d.getMonth() + 1, t = d.getDate();
+    let los = []; // [Name, Gewicht]
+    if (auftritt === 'schlitten') {
+      los = [['schlitten-1', 1], ['schlitten-2', 1]];
+    } else if (auftritt === 'figur') {
+      const advent = adventssonntag(d);
+      if (m === 12 && (t === 5 || t === 6)) los = [['nikolaus', 4], ['hohoho-1', 1], ['hohoho-2', 1]];
+      else if (m === 12 && t === 24) los = [['heiligabend', 4], ['hohoho-weihnachten', 2], ['hohoho-1', 1], ['hohoho-2', 1]];
+      else if (m === 1) los = [['neujahr', 3], ['hohoho-1', 1], ['hohoho-2', 1]];
+      else {
+        los = [['hohoho-1', 3], ['hohoho-2', 3], ['hohoho-brav', 1]];
+        // "Frohe Weihnachten" erst, wenn es so weit ist -- Ende November wäre es ein Versehen.
+        if (m === 12 && t >= 20) los.push(['hohoho-weihnachten', t >= 25 ? 4 : 2]);
+        if (m === 12 && t === 31) los.push(['neujahr', 2]);
+      }
+      // Der Adventssonntag kommt DAZU, auch am 6. Dezember: Beides stimmt an dem Tag.
+      if (advent) los.push(['advent-' + advent, 4]);
+    }
+    if (los.length > 1) los = los.filter(([n]) => n !== zuletzt);
+    if (!los.length) return '';
+    let wurf = r() * los.reduce((s, [, g]) => s + g, 0);
+    for (const [n, g] of los) { wurf -= g; if (wurf < 0) return n; }
+    return los[los.length - 1][0];
+  }
+
   // --- Ho, ho, ho --------------------------------------------------------------------------------
   //
   // Der Weihnachtsmann SAGT etwas. Ein Ruf lässt sich nicht aus Sinustönen rechnen wie eine
@@ -858,6 +915,7 @@
     anlassErmitteln, adventStand, figurFuer, schildText, anlassZustand, flockenDaten, schneeHtml,
     adventskranzSvg, girlandeHtml, schichtHtml, schichtSetzen,
     AUFTRITTE, auftrittWaehlen, auftrittWuerfeln, Auftritte, tonSpielen, hohoho, stimmeWaehlen, RUFE,
+    SPRUECHE, SPRUECHE_MIT_GLOCKEN, spruchWaehlen, adventssonntag,
     FLOCKEN_VORGABE, BOEGEN, BUEHNE_TOENE_WEIHNACHTEN
   };
   global.AnlassModul = api;

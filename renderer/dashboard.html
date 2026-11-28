@@ -1117,8 +1117,41 @@ function anlassGaesteAnpassen() {
 // `erzwingen` (der Knopf "Auf der Wand abspielen") uebergeht 2 und 3, nicht 1.
 const ANLASS_TON_SYSTEM_MINDESTENS = 25; // Prozent; angehoben wird wie beim Akku-Warnton nur nach oben
 let anlassTonLautGesetzt = false;
-// Was die Sprachausgabe zuletzt gemeldet hat -- fuer die Pruefung aus der Ferne (zustandMelden).
+// Was zuletzt zu hoeren war -- fuer die Pruefung aus der Ferne (zustandMelden).
 let anlassStimmeErgebnis = '';
+let anlassSpruchZuletzt = '';
+let anlassSpruchLaeuft = null;
+
+// Die gerechneten Toene (Schellen, Gloeckchen) und der Notbehelf, wenn keine Aufnahme da ist.
+function anlassRechenton(ton, info, laut) {
+  if (!tonKontext) tonKontext = new (window.AudioContext || window.webkitAudioContext)();
+  if (tonKontext.state === 'suspended') tonKontext.resume();
+  AnlassModul.tonSpielen(tonKontext, ton, { dauer: info && info.dauer ? info.dauer * 0.6 : 5,
+    richtung: (info && info.richtung) || 1, laut: laut === undefined ? 0.22 : laut });
+}
+
+// Eine Aufnahme abspielen. Scheitert das (Datei fehlt, laesst sich nicht lesen), ruft
+// `sonst` -- dort steht der Notbehelf.
+function anlassSpruchSpielen(name, sonst) {
+  try {
+    // Ein Spruch, der noch laeuft, wird abgebrochen: Zwei Stimmen uebereinander versteht niemand.
+    if (anlassSpruchLaeuft) { try { anlassSpruchLaeuft.pause(); } catch (e) { /* schon zu Ende */ } }
+    const aufnahme = new Audio('shared/toene/' + name + '.mp3');
+    anlassSpruchLaeuft = aufnahme;
+    anlassStimmeErgebnis = 'angefangen: ' + name;
+    aufnahme.addEventListener('ended', () => { anlassStimmeErgebnis = 'gespielt: ' + name; });
+    const scheitern = () => { anlassStimmeErgebnis = 'fehlt: ' + name; if (sonst) sonst(); };
+    aufnahme.addEventListener('error', scheitern, { once: true });
+    const zusage = aufnahme.play();
+    if (zusage && zusage.catch) zusage.catch(() => { if (anlassStimmeErgebnis.startsWith('angefangen')) scheitern(); });
+    anlassSpruchZuletzt = name;
+    return true;
+  } catch (e) {
+    if (sonst) sonst();
+    return false;
+  }
+}
+
 function anlassTonSpielen(name, info, erzwingen) {
   const ton = (info && info.ton) || (AnlassModul.AUFTRITTE[name] && AnlassModul.AUFTRITTE[name].ton);
   if (!IM_PANEL || !ton) return false;
@@ -1131,18 +1164,26 @@ function anlassTonSpielen(name, info, erzwingen) {
       anlassTonLautGesetzt = true;
       window.wallApi.systemLautstaerkeAnheben(ANLASS_TON_SYSTEM_MINDESTENS);
     }
-    // Der Weihnachtsmann SAGT "Ho, ho, ho!" -- mit einer Stimme von Windows. Gibt es keine,
-    // bleibt das Glockenspiel.
-    if (ton === 'hohoho') {
-      anlassStimmeErgebnis = 'angefangen';
-      if (AnlassModul.hohoho(window.speechSynthesis, window.SpeechSynthesisUtterance,
-        { beiEnde: (ergebnis) => { anlassStimmeErgebnis = ergebnis; } })) return true;
-      anlassStimmeErgebnis = 'keine Stimme';
+    // Der Weihnachtsmann hat eine STIMME: aufgenommene Sprueche, ausgesucht nach Auftritt und
+    // Tag (spruchWaehlen). Die Notbehelfe dahinter, in dieser Reihenfolge: die Sprachausgabe
+    // von Windows, dann das Glockenspiel.
+    const spruch = AnlassModul.spruchWaehlen(name, new Date(), anlassSpruchZuletzt);
+    if (spruch) {
+      anlassSpruchSpielen(spruch, () => {
+        if (name === 'figur') {
+          if (AnlassModul.hohoho(window.speechSynthesis, window.SpeechSynthesisUtterance,
+            { beiEnde: (ergebnis) => { anlassStimmeErgebnis = ergebnis; } })) return;
+          anlassRechenton('glockenspiel', info);
+        } else {
+          anlassRechenton(ton, info);
+        }
+      });
+      // Zum Schlitten gehoeren Schellen. In manchen Aufnahmen laeuten schon Glocken -- dort
+      // kommen keine dazu; sonst leise darunter, damit die Stimme vorn bleibt.
+      if (name === 'schlitten' && !AnlassModul.SPRUECHE_MIT_GLOCKEN.includes(spruch)) anlassRechenton('schellen', info, 0.1);
+      return true;
     }
-    if (!tonKontext) tonKontext = new (window.AudioContext || window.webkitAudioContext)();
-    if (tonKontext.state === 'suspended') tonKontext.resume();
-    AnlassModul.tonSpielen(tonKontext, ton === 'hohoho' ? 'glockenspiel' : ton,
-      { dauer: info && info.dauer ? info.dauer * 0.7 : 5, richtung: (info && info.richtung) || 1 });
+    anlassRechenton(ton === 'hohoho' ? 'glockenspiel' : ton, info);
     return true;
   } catch (e) {
     return false;

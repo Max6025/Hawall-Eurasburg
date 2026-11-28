@@ -391,26 +391,25 @@ if (wmPruefen) {
   const ergebnis = (text, gut) => { $('anlassTonErgebnis').textContent = text; $('anlassTonErgebnis').className = 'result ' + (gut ? 'ok' : 'err'); };
   let kontext = null;
   $('anlassTonHier').addEventListener('click', () => {
-    try {
-      // Erst der Ruf des Weihnachtsmanns -- mit der Stimme DIESES Browsers; auf der Wand spricht
-      // die Stimme des Panels und kann anders klingen. Danach die Schellen des Schlittens.
-      const gesprochen = AnlassModul.hohoho(window.speechSynthesis, window.SpeechSynthesisUtterance, { text: 'Ho, ho, ho!' });
-      if (!kontext) kontext = new (window.AudioContext || window.webkitAudioContext)();
-      if (kontext.state === 'suspended') kontext.resume();
-      setTimeout(() => AnlassModul.tonSpielen(kontext, 'schellen', { dauer: 4 }), gesprochen ? 2600 : 0);
-      ergebnis(gesprochen
-        ? 'Erst „Ho, ho, ho!“ (mit der Stimme dieses Browsers – auf der Wand spricht die des Panels), dann die Schellen.'
-        : 'Dieser Browser hat keine Sprachausgabe; zu hören sind nur die Schellen. Auf der Wand ruft der Weihnachtsmann.', true);
-    } catch (e) {
-      ergebnis('Dieser Browser gibt keinen Ton her: ' + String(e && e.message || e), false);
-    }
+    // Dieselben Aufnahmen wie auf der Wand: erst der Weihnachtsmann, dann der Schlitten.
+    const spielen = (name) => new Promise((fertig) => {
+      const a = new Audio('/shared/toene/' + name + '.mp3');
+      a.addEventListener('ended', () => fertig(true), { once: true });
+      a.addEventListener('error', () => fertig(false), { once: true });
+      const z = a.play(); if (z && z.catch) z.catch(() => fertig(false));
+    });
+    ergebnis('Erst der Weihnachtsmann, dann der Schlitten …', true);
+    spielen('hohoho-1').then((ok1) => spielen('schlitten-1').then((ok2) => {
+      ergebnis(ok1 && ok2 ? 'Das waren zwei der dreizehn Sprüche. Auf der Wand wählt er nach Auftritt und Tag.'
+        : 'Eine Aufnahme ließ sich hier nicht abspielen.', ok1 && ok2);
+    }));
   });
   $('anlassTonWand').addEventListener('click', async () => {
     try {
       const r = await fetch('/api/anzeige/anlass-ton', { method: 'POST' }).then(x => x.json());
       if (!r.ok) return ergebnis('Fehler: ' + (r.error || 'unbekannt'), false);
       ergebnis(r.anzeigen > 0
-        ? 'Abgeschickt – auf der Wand taucht jetzt der Weihnachtsmann auf und ruft „Ho, ho, ho!“.'
+        ? 'Abgeschickt – auf der Wand taucht jetzt der Weihnachtsmann auf und sagt seinen Spruch.'
         : 'Es hört gerade keine Anzeige zu – läuft das Wall Display?', r.anzeigen > 0);
     } catch (e) {
       ergebnis('Nicht erreichbar: ' + String(e && e.message || e), false);
