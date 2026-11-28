@@ -313,6 +313,34 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     res.json({ ok: true });
   });
   app.get('/api/geraet/bildrate', (req, res) => res.json({ ok: true, ergebnis: bildrateErgebnis }));
+  // Aus der Ferne pruefen, ob Hinlegen und Aufwecken sauber laufen: Die Anzeige meldet ihren
+  // Zustand -- auf Wunsch weckt sie sich vorher selbst, so wie ein Tipp es taete. Anlass: Seit
+  // 1.0.43 ruht das Dashboard unter dem Schoner (content-visibility), und ein Dashboard, das
+  // nach dem Antippen leer bliebe, saehe man nur, wenn man davorsteht.
+  let pruefErgebnis = null;
+  app.post('/api/anzeige/zustand-pruefen', (req, res) => {
+    pruefErgebnis = null;
+    const zeile = 'data: ' + JSON.stringify({ befehl: 'zustand', wecken: !!(req.body || {}).wecken }) + '\n\n';
+    for (const h of anzeigeHoerer) {
+      try { h.write(zeile); } catch (e) { anzeigeHoerer.delete(h); }
+    }
+    res.json({ ok: true, anzeigen: anzeigeHoerer.size });
+  });
+  app.post('/api/geraet/zustand', (req, res) => {
+    const b = req.body || {};
+    // Nur bekannte Felder, nur einfache Werte.
+    const erlaubt = ['schonerLag', 'deckte', 'geweckt', 'schonerLiegt', 'deckt', 'contentVisibility', 'karten',
+      'kartenHoehe', 'gaesteVorn', 'gaesteSchoner', 'anlass', 'lichtThema', 'bewegungen'];
+    pruefErgebnis = {};
+    for (const k of erlaubt) {
+      const v = b[k];
+      if (['string', 'number', 'boolean'].includes(typeof v)) pruefErgebnis[k] = typeof v === 'string' ? v.slice(0, 40) : v;
+    }
+    pruefErgebnis.gemeldet = new Date().toISOString();
+    res.json({ ok: true });
+  });
+  app.get('/api/geraet/zustand', (req, res) => res.json({ ok: true, ergebnis: pruefErgebnis }));
+
   // Die genaue Messung: was Chromium in N Sekunden wirklich gezeichnet hat (siehe main.js).
   app.get('/api/debug/bildfluss', async (req, res) => {
     if (typeof bildflussMessen !== 'function') return res.json({ ok: false, error: 'nur auf dem Panel' });

@@ -1489,12 +1489,46 @@ function befehleEmpfangen() {
     // "Weihnachtston auf der Wand abspielen": der Schlitten fliegt einmal vorbei, mit Schellen --
     // auch wenn gerade der Schoner liegt, denn wer den Knopf drueckt, will es hoeren.
     if (befehl && befehl.befehl === 'bildrate') bildrateMessen(befehl.sekunden);
+    if (befehl && befehl.befehl === 'zustand') zustandMelden(!!befehl.wecken);
     if (befehl && befehl.befehl === 'anlass-ton') {
       const gaeste = (schoner && schoner.istSichtbar()) ? anlassGaeste.schoner : anlassGaeste.vorn;
       if (gaeste) gaeste.auftreten('schlitten');
       anlassTonSpielen('schlitten', { ton: 'schellen', dauer: 8, richtung: 1 }, true);
     }
   };
+}
+
+// --- Zustand melden (und auf Wunsch vorher aufwecken) ------------------------------------------
+//
+// Fuer die Pruefung aus der Ferne: Liegt der Schoner, ruht das Dashboard, laufen die Auftritte
+// in der richtigen Schicht? Mit `wecken` tut die Anzeige erst, was ein Tipp taete
+// (schonerWecken), und meldet anderthalb Sekunden spaeter -- dann ist die Blende durch.
+function zustandMelden(wecken) {
+  const vorher = {
+    schonerLag: !!(schoner && schoner.istSichtbar()),
+    deckte: document.body.classList.contains('schoner-deckt')
+  };
+  if (wecken) schonerWecken();
+  setTimeout(() => {
+    const app = document.querySelector('.app');
+    const karte = document.querySelector('#grid .card');
+    const meldung = Object.assign({
+      geweckt: !!wecken,
+      schonerLiegt: !!(schoner && schoner.istSichtbar()),
+      deckt: document.body.classList.contains('schoner-deckt'),
+      contentVisibility: app ? getComputedStyle(app).contentVisibility : '',
+      karten: document.querySelectorAll('#grid .card').length,
+      kartenHoehe: karte ? Math.round(karte.getBoundingClientRect().height) : 0,
+      gaesteVorn: !!(anlassGaeste.vorn && anlassGaeste.vorn.laeuft()),
+      gaesteSchoner: !!(anlassGaeste.schoner && anlassGaeste.schoner.laeuft()),
+      anlass: document.body.classList.contains('anlass-weihnachten') ? 'weihnachten' : '',
+      lichtThema: document.body.classList.contains('light-theme'),
+      bewegungen: document.getAnimations().length
+    }, vorher);
+    fetch(`${API}/api/geraet/zustand`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(meldung)
+    }).catch(() => {});
+  }, wecken ? 1500 : 50);
 }
 
 // --- Bildrate nachmessen ------------------------------------------------------------------------
