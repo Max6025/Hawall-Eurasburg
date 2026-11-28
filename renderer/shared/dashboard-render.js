@@ -1449,21 +1449,82 @@
   // Treppe hinauf, die Stehlampe neben dem Sofa atmet. Sie laeuft als Schleife, auch auf dem
   // Wall Display selbst, nicht nur im Bildschirmschoner.
   //
-  // Dieselben Teile tragen in Symbol UND Silhouette dieselbe Klasse (ort-rauch, ort-strahlen,
-  // ort-laeufer, ort-schein), damit eine Regel in dashboard.css beide bewegt. Die Silhouette
-  // ist nur zu 7,5 % sichtbar; dort traegt nur, was als FORM dazukommt oder sich verschiebt
-  // (ein Rauchpuff, ein Laeufer, ein Lichtkreis), nicht eine Helligkeit innerhalb der Flaeche.
+  // WAS SICH BEWEGT, IST HTML UND LIEGT UEBER DER ZEICHNUNG -- NICHT IN IHR. Das ist seit
+  // 1.0.42 so und der wichtigste Satz hier. Vorher sassen Rauch, Strahlen und Laeufer als
+  // Formen IM SVG, und eine Bewegung innerhalb eines SVG rechnet der Browser auf dem
+  // Hauptstrang: Er zeichnet fuer jedes Bild die ganze Zeichnung neu, bei der Silhouette also
+  // eine Flaeche von Kartengroesse. Auf dem Surface Go gemessen (zusammen mit dem
+  // Weihnachtsdesign): 198 % eines Kerns und 46 % der Grafikeinheit, und gemeldet wurde es als
+  // Ruckeln. Ein HTML-Element, das nur transform und opacity aendert, bewegt dagegen die
+  // Grafikeinheit allein -- auch dann, wenn der Hauptstrang gerade Karten neu baut.
+  //
+  // Jede Zeichnung ist deshalb ein Kasten (.ort-bild) mit dem STEHENDEN SVG und den bewegten
+  // Teilen (.ort-teil) als Geschwistern, in Prozent des Kastens daraufgelegt. Dieselben Teile
+  // tragen in Symbol UND Silhouette dieselbe Klasse (ort-rauch, ort-strahlen, ort-laeufer,
+  // ort-schein, ort-flocken), damit eine Regel in dashboard.css beide bewegt.
   //
   // `animationen`: [Name, Dauer in Sekunden, wechselnd] -- die Dauer steht ein zweites Mal in
   // dashboard.css, siehe HVAC_ANIMATIONEN fuer die Lehre dazu und test/ort.test.js fuer die
   // Pruefung, dass beide Seiten uebereinstimmen.
+  //
+  // FESTFASSUNG: Innen und Aussen haben eine zweite Zeichnung fuer das Weihnachtsdesign (auf dem
+  // Hausdach liegt Schnee; statt der Sonne steht ein Schneemann im Schneefall). Beide stehen im
+  // Markup, das Stylesheet zeigt eine davon -- so braucht keine Karte neu gebaut zu werden,
+  // wenn der Anlass beginnt oder endet, und buildCard muss nichts davon wissen.
+
+  const ORT_STRICH = ' fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"';
+  const ORT_FLAECHE = ' fill="currentColor"';
+  // Ein Kasten: das stehende SVG, davor/dahinter die bewegten Teile.
+  function ortBild(svgAttr, zeichnung, teile, klasse, dahinter) {
+    return `<span class="ort-bild${klasse ? ' ' + klasse : ''}">${dahinter || ''}` +
+      `<svg viewBox="0 0 24 24"${svgAttr} overflow="visible">${zeichnung}</svg>${teile || ''}</span>`;
+  }
+  // Ein bewegtes Teil: ein runder Fleck in der Farbe der Zeichnung, Lage und Groesse in den
+  // Einheiten des viewBox (0..24) angegeben und hier in Prozent umgerechnet.
+  function ortFleck(klasse, cx, cy, r, stil) {
+    const pz = (v) => (v / 24 * 100).toFixed(2) + '%';
+    return `<i class="ort-teil ${klasse}" style="left:${pz(cx - r)};top:${pz(cy - r)};width:${pz(2 * r)};height:${pz(2 * r)}${stil ? ';' + stil : ''}"></i>`;
+  }
+  const ortRauch = (cx, cy, r) => ['r1', 'r2', 'r3'].map(k => ortFleck('ort-rauch ' + k, cx, cy, r)).join('');
+  // Schneeflocken, die durch den Kasten fallen: je eine Spalte, je ein Versatz.
+  const ortFlocken = (r, spalten) => spalten.map((x, i) => ortFleck('ort-flocken f' + (i + 1), x, -r, r)).join('');
+
+  // -- Innen: das Haus. Alltag mit rauchendem Kamin; zum Fest liegt Schnee auf dem Dach.
+  const HAUS_SYMBOL = '<path d="M3 13.5 12 6.5l9 7"/><path d="M5.5 12v9.5h13V12"/><path d="M10 21.5V16h4v5.5"/><path d="M16 9.6V6h2.5v6"/>';
+  const HAUS_FLAECHE = '<path d="M12 4.5 1.5 13.2l1.4 1.6 1.6-1.3V23h15v-9.5l1.6 1.3 1.4-1.6z"/><rect x="16" y="6" width="2.6" height="7"/>';
+  // Die Schneedecke folgt dem Dach und haengt unten in Bogen ueber -- als FLAECHE, damit sie
+  // auch im kleinen Symbol als Schnee zu lesen ist und nicht als zweite Dachlinie.
+  const HAUS_SCHNEE_SYMBOL = '<path d="M2 13.4 12 5.4l10 8-1.2 1.5Q19.4 12.9 18 14 17 11.4 15.2 12.2 14 9.2 12 9.9 10 9.2 8.8 12.2 7 11.4 6 14 4.6 12.9 3.2 14.9Z" fill="currentColor" stroke="none"/>' +
+    '<path d="M5.5 14.5v7h13v-7"/><path d="M10 21.5V17h4v4.5"/><path d="M16.2 8.2V5.6h2.4v4.5"/>';
+  const HAUS_SCHNEE_FLAECHE =
+    '<g opacity=".46"><path d="M12 4.5 1.5 13.2l1.4 1.6 1.6-1.3V23h15v-9.5l1.6 1.3 1.4-1.6z"/><rect x="16" y="6" width="2.6" height="7"/></g>' +
+    '<rect x="9.6" y="15.2" width="4.8" height="4.8" rx=".5" fill="#ffd166" opacity=".9"/>' +
+    '<path d="M12 1.9.8 11.2l2.2 2.5Q4.6 11.6 6.2 12.9 7.4 10 9.2 11 10.4 8 12 8.8 13.6 8 14.8 11 16.6 10 17.8 12.9 19.4 11.6 21 13.7l2.2-2.5Z"/>' +
+    '<rect x="15.5" y="4.8" width="3.6" height="1.9" rx=".95"/>';
+
+  // -- Aussen: die Sonne. Zum Fest ein Schneemann, um den es schneit.
+  const SONNE_STRAHLEN_SYMBOL = '<path d="M12 2.3v2.1M12 19.6v2.1M2.3 12h2.1M19.6 12h2.1M5.4 5.4l1.5 1.5M17.1 17.1l1.5 1.5M18.6 5.4l-1.5 1.5M6.9 17.1l-1.5 1.5"/>';
+  const SONNE_STRAHLEN_FLAECHE = '<rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/>';
+  // Die Strahlen sind ein eigenes, kastengrosses Teil: Gedreht wird das HTML-Element, nicht
+  // eine Gruppe im SVG.
+  const ortStrahlen = (svgAttr, zeichnung) =>
+    `<i class="ort-teil ort-strahlen" style="left:0;top:0;width:100%;height:100%"><svg viewBox="0 0 24 24"${svgAttr}>${zeichnung}</svg></i>`;
+  const SCHNEEMANN_SYMBOL = '<circle cx="12" cy="16.2" r="5.4"/><circle cx="12" cy="7.8" r="3.3"/><path d="M8.6 5h6.8M10 5V2.2h4V5"/><path d="M7 14.4 3.6 12M17 14.4 20.4 12"/>';
+  const SCHNEEMANN_FLAECHE =
+    '<path d="M6.2 13.6 2.4 10.8M17.8 13.6 21.6 10.8" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none" opacity=".6"/>' +
+    '<circle cx="12" cy="16.6" r="6.6"/><circle cx="12" cy="7.9" r="4.3"/>' +
+    '<g opacity=".5"><rect x="9.1" y="0.6" width="5.8" height="3.8" rx=".6"/><rect x="7.5" y="3.9" width="9" height="1.5" rx=".75"/></g>' +
+    '<path d="M7.9 10.6Q12 13 16.1 10.6L16.4 12.4Q12 14.8 7.6 12.4Z" fill="#e0263b" opacity=".9"/>';
+
   const ORTE = {
     innen: {
       text: 'Innen',
-      // Der Kamin ist neu dazugekommen, als Traeger der Bewegung: Ein Haus, aus dem Rauch
-      // steigt, ist ein bewohntes Haus -- und genau das heisst "innen".
-      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" overflow="visible"><path d="M3 13.5 12 6.5l9 7"/><path d="M5.5 12v9.5h13V12"/><path d="M10 21.5V16h4v5.5"/><path d="M16 9.6V6h2.5v6"/><g class="ort-rauch" fill="currentColor" stroke="none"><circle class="r1" cx="17.25" cy="4.2" r="1.2"/><circle class="r2" cx="17.25" cy="4.2" r="1.2"/><circle class="r3" cx="17.25" cy="4.2" r="1.2"/></g></svg>',
-      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor" overflow="visible"><path d="M12 4.5 1.5 13.2l1.4 1.6 1.6-1.3V23h15v-9.5l1.6 1.3 1.4-1.6z"/><rect x="16" y="6" width="2.6" height="7"/><g class="ort-rauch"><circle class="r1" cx="17.3" cy="4.2" r="1.3"/><circle class="r2" cx="17.3" cy="4.2" r="1.3"/><circle class="r3" cx="17.3" cy="4.2" r="1.3"/></g></svg>',
+      // Der Kamin ist der Traeger der Bewegung: Ein Haus, aus dem Rauch steigt, ist ein
+      // bewohntes Haus -- und genau das heisst "innen".
+      symbol: ortBild(ORT_STRICH, HAUS_SYMBOL, ortRauch(17.25, 4.2, 1.2), 'ort-alltag hat-fest') +
+              ortBild(ORT_STRICH, HAUS_SCHNEE_SYMBOL, ortRauch(17.4, 3.9, 1.2), 'ort-fest'),
+      silhouette: ortBild(ORT_FLAECHE, HAUS_FLAECHE, ortRauch(17.3, 4.2, 1.3), 'ort-alltag hat-fest') +
+                  ortBild(ORT_FLAECHE, HAUS_SCHNEE_FLAECHE, ortRauch(17.3, 3, 1.3), 'ort-fest'),
       animationen: [['rauch', 4.2, false]]
     },
     // SONNE, nicht mehr Tanne. Gemeldet wurde "nimm eins das man besser erkennt das draussen
@@ -1472,16 +1533,19 @@
     // Gegenstueck zum Haus -- und als grosse, blasse Silhouette traegt ein Kreis mit Strahlen
     // weiter als eine schmale Baumspitze, weil er in jede Richtung Flaeche hat.
     //
-    // Dass eine Sonne auch "sonnig" heissen koennte, faellt hier nicht ins Gewicht: Daneben
-    // steht der Chip "AUSSEN", und das Gegenstueck auf der Nachbarkarte ist ein Haus.
-    //
     // Die Strahlen wandern langsam um den Kern -- eine Umdrehung in einer Minute. Das ist die
     // eine Stelle, an der eine Drehung das richtige Bild ist.
+    //
+    // Zum Fest steht dort ein SCHNEEMANN im Schneefall: Gewuenscht war, "dass da, wo jetzt die
+    // Sonne im Hintergrund ist und sich dreht, was anderes ist". Ein Schneemann steht draussen,
+    // und zwar nur dort.
     aussen: {
       text: 'Außen',
-      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path class="ort-strahlen" d="M12 2.3v2.1M12 19.6v2.1M2.3 12h2.1M19.6 12h2.1M5.4 5.4l1.5 1.5M17.1 17.1l1.5 1.5M18.6 5.4l-1.5 1.5M6.9 17.1l-1.5 1.5"/></svg>',
-      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="5.4"/><g class="ort-strahlen"><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2"/><rect x="10.8" y="0.6" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="10.8" y="19.8" width="2.4" height="3.6" rx="1.2" transform="rotate(45 12 12)"/><rect x="0.6" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/><rect x="19.8" y="10.8" width="3.6" height="2.4" rx="1.2" transform="rotate(45 12 12)"/></g></svg>',
-      animationen: [['strahlen', 60, false]]
+      symbol: ortBild(ORT_STRICH, '<circle cx="12" cy="12" r="4.2"/>', ortStrahlen(ORT_STRICH, SONNE_STRAHLEN_SYMBOL), 'ort-alltag hat-fest') +
+              ortBild(ORT_STRICH, SCHNEEMANN_SYMBOL, ortFlocken(1, [3.4, 20.4]), 'ort-fest'),
+      silhouette: ortBild(ORT_FLAECHE, '<circle cx="12" cy="12" r="5.4"/>', ortStrahlen(ORT_FLAECHE, SONNE_STRAHLEN_FLAECHE), 'ort-alltag hat-fest') +
+                  ortBild(ORT_FLAECHE, SCHNEEMANN_FLAECHE, ortFlocken(0.75, [2.2, 6.4, 18.2, 21.8, 12.4]), 'ort-fest'),
+      animationen: [['strahlen', 60, false], ['flocken', 7, false]]
     },
     // TREPPENHAUS, der dritte Ort. Der Anlass: Im Haus haengen Fuehler im Wohnbereich UND im
     // Treppenhaus, und beide sind "innen" -- zwei Haeuser nebeneinander sagten nicht, welche
@@ -1493,24 +1557,31 @@
     // auch die Pille eine eigene Form hat.
     //
     // Die Bewegung: ein Laeufer (ein Punkt), der Stufe fuer Stufe hinaufsteigt, oben
-    // verschwindet und unten wieder anfaengt. Die Stufen des Symbols (3,16.5 / 7.5,12 / 12,7.5 /
-    // 16.5,3) liegen 4,5 Einheiten auseinander; die Silhouette ist um 0,1 anders geteilt, das
-    // sieht man nicht.
+    // verschwindet und unten wieder anfaengt. Eine Stufe ist 4,5 Einheiten hoch und breit;
+    // weil der Punkt in Symbol und Silhouette verschieden gross ist und translate() in Prozent
+    // der EIGENEN Groesse rechnet, traegt jeder seinen Schritt als --schritt mit.
     treppenhaus: {
       text: 'Treppenhaus',
-      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21v-4.5h4.5V12H12V7.5h4.5V3H21v18z"/><circle class="ort-laeufer" cx="5.25" cy="14.8" r="1.4" fill="currentColor" stroke="none"/></svg>',
-      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 22.5v-5h4.6v-4.6h4.6V8.3h4.6V3.7h7.2v18.8z"/><circle class="ort-laeufer" cx="3.8" cy="15.6" r="1.5"/></svg>',
+      symbol: ortBild(ORT_STRICH, '<path d="M3 21v-4.5h4.5V12H12V7.5h4.5V3H21v18z"/>',
+        ortFleck('ort-laeufer', 5.25, 14.8, 1.4, '--schritt:' + (4.5 / 2.8 * 100).toFixed(1) + '%')),
+      silhouette: ortBild(ORT_FLAECHE, '<path d="M1.5 22.5v-5h4.6v-4.6h4.6V8.3h4.6V3.7h7.2v18.8z"/>',
+        ortFleck('ort-laeufer', 3.8, 15.6, 1.5, '--schritt:' + (4.6 / 3 * 100).toFixed(1) + '%')),
       animationen: [['laeufer', 6, false]]
     },
     // WOHNZIMMER, der vierte Ort. Gewuenscht als eigener Raum neben "innen": Das Sofa ist das
     // Zeichen, an dem jeder den Raum erkennt. Die Bewegung ist die Stehlampe daneben, deren
-    // Lichtschein langsam an- und abschwillt -- das Zimmer, in dem man abends sitzt.
+    // Lichtschein langsam an- und abschwillt -- das Zimmer, in dem man abends sitzt. Der Schein
+    // liegt HINTER der Lampe (im Markup vor dem SVG), sonst deckte er den Schirm zu.
     wohnzimmer: {
       text: 'Wohnzimmer',
-      symbol: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11V8.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2V11"/><path d="M2 13a2 2 0 0 1 4 0v2h7v-2a2 2 0 0 1 4 0v5H2z"/><path d="M4 20v1.5M15 20v1.5"/><circle class="ort-schein" cx="20.5" cy="9.3" r="3.8" fill="currentColor" stroke="none"/><path d="M20.5 21.5V11M18.5 21.5h4"/><path d="M17.5 11l1.2-4.5h3.6l1.2 4.5z"/></svg>',
+      symbol: ortBild(ORT_STRICH,
+        '<path d="M4 11V8.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2V11"/><path d="M2 13a2 2 0 0 1 4 0v2h7v-2a2 2 0 0 1 4 0v5H2z"/><path d="M4 20v1.5M15 20v1.5"/><path d="M20.5 21.5V11M18.5 21.5h4"/><path d="M17.5 11l1.2-4.5h3.6l1.2 4.5z"/>',
+        '', '', ortFleck('ort-schein', 20.5, 9.3, 3.8)),
       // Die Silhouette haengt rechts unten ueber den Kartenrand hinaus (right: -4 %); die Lampe
       // steht deshalb nicht am rechten Rand des Bildes, sondern bei x = 17, sonst ist sie weg.
-      silhouette: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="5.5" width="10" height="7.5" rx="2"/><path d="M0.5 13.5a2.2 2.2 0 0 1 4.4 0v1.6h6.2v-1.6a2.2 2.2 0 0 1 4.4 0v7H0.5z"/><rect x="2.2" y="20.5" width="1.6" height="2.3"/><rect x="12.2" y="20.5" width="1.6" height="2.3"/><circle class="ort-schein" cx="17.6" cy="8.8" r="4.2"/><rect x="17" y="11" width="1.3" height="11"/><rect x="15.4" y="21.3" width="4.5" height="1.4"/><path d="M14.3 11.3l1.3-5h3.9l1.3 5z"/></svg>',
+      silhouette: ortBild(ORT_FLAECHE,
+        '<rect x="3" y="5.5" width="10" height="7.5" rx="2"/><path d="M0.5 13.5a2.2 2.2 0 0 1 4.4 0v1.6h6.2v-1.6a2.2 2.2 0 0 1 4.4 0v7H0.5z"/><rect x="2.2" y="20.5" width="1.6" height="2.3"/><rect x="12.2" y="20.5" width="1.6" height="2.3"/><rect x="17" y="11" width="1.3" height="11"/><rect x="15.4" y="21.3" width="4.5" height="1.4"/><path d="M14.3 11.3l1.3-5h3.9l1.3 5z"/>',
+        '', '', ortFleck('ort-schein', 17.6, 8.8, 4.2)),
       animationen: [['schein', 3.2, true]]
     }
   };

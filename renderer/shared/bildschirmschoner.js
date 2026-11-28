@@ -142,7 +142,7 @@
     } else {
       bild.style.backgroundImage = '';
       this.wurzel.classList.remove('bs-mit-bild');
-      if (this.sichtbar) this.buehne.starten();
+      if (this.sichtbar && !this.buehneGesperrt) this.buehne.starten();
     }
     this.art = gilt;
     return gilt;
@@ -157,13 +157,24 @@
     this.buehne.toene = Array.isArray(toene) && toene.length ? toene : null;
   };
 
+  /**
+   * Die Buehne ganz stilllegen (Weihnachtsdesign). Dort sind die Karten deckend bunt; von den
+   * driftenden Wolken dahinter saehe man nur die Fugen, und sie sind grosse weichgezeichnete
+   * Flaechen, die die Grafikeinheit Bild fuer Bild mischt. Gesperrt laeuft auch kein Zeitgeber.
+   */
+  Bildschirmschoner.prototype.buehneSperren = function (an) {
+    this.buehneGesperrt = !!an;
+    if (this.buehneGesperrt) this.buehne.stoppen();
+    else if (this.sichtbar && this.art !== 'bild') this.buehne.starten();
+  };
+
   Bildschirmschoner.prototype.istSichtbar = function () { return !!this.sichtbar; };
 
   Bildschirmschoner.prototype.zeigen = function () {
     if (this.sichtbar) return;
     this.sichtbar = true;
     this.wurzel.classList.add('bs-sichtbar');
-    if (this.art !== 'bild') this.buehne.starten();
+    if (this.art !== 'bild' && !this.buehneGesperrt) this.buehne.starten();
   };
 
   Bildschirmschoner.prototype.verbergen = function () {

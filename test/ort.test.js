@@ -103,3 +103,58 @@ test('Jeder Ort hat seine eigene Bewegung, in Symbol und Silhouette, mit der Dau
   assert.strictEqual(R.ortPhasenStil('innen', 5000), R.ortPhasenStil('innen', 5000 + 4200));
   assert.strictEqual(R.ortPhasenStil('nirgends', 0), '');
 });
+
+// --- Fluessig: die Bewegung der Ortszeichen rechnet die Grafikeinheit ----------------------------
+//
+// Bis 1.0.41 sassen Rauch, Strahlen und Laeufer als Formen IM SVG. Eine Bewegung dort zeichnet
+// der Browser auf dem Hauptstrang, Bild fuer Bild, die ganze Zeichnung neu -- bei der Silhouette
+// eine Flaeche von Kartengroesse. Gemessen auf dem Surface Go: 198 % eines Kerns.
+
+test('Was sich an einem Ortszeichen bewegt, ist HTML ueber der Zeichnung, nie eine Form darin', () => {
+  for (const [ort, eintrag] of Object.entries(R.ORTE)) {
+    for (const [welches, html] of [['Symbol', eintrag.symbol], ['Silhouette', eintrag.silhouette]]) {
+      assert.ok(html.includes('class="ort-bild'), `${ort}/${welches}: kein Kasten`);
+      for (const block of html.match(/<svg[\s\S]*?<\/svg>/g) || []) {
+        assert.ok(!/class="ort-/.test(block), `${ort}/${welches}: bewegtes Teil im SVG`);
+      }
+      for (const [name] of eintrag.animationen) {
+        assert.match(html, new RegExp(`<i class="ort-teil ort-${name}`), `${ort}/${welches}: ort-${name} ist kein eigenes Teil`);
+      }
+    }
+  }
+});
+
+test('Die Bewegungen der Ortszeichen aendern nur transform und opacity', () => {
+  const css = require('fs').readFileSync(require('path').join(__dirname, '../renderer/shared/dashboard.css'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const bloecke = [...css.matchAll(/@keyframes (ort-[a-z-]+) \{((?:[^{}]*\{[^{}]*\})+)\s*\}/g)];
+  assert.ok(bloecke.length >= 5, `zu wenige gefunden (${bloecke.length})`);
+  for (const [, name, inhalt] of bloecke) {
+    for (const m of inhalt.matchAll(/([a-z-]+)\s*:/g)) {
+      assert.ok(['transform', 'opacity'].includes(m[1]), `${name} aendert ${m[1]}`);
+    }
+  }
+});
+
+// Gewuenscht: "dass das Haus im Hintergrund bei innen Schnee am Dach hat" und "dass da, wo jetzt
+// die Sonne im Hintergrund ist und sich dreht, was anderes ist".
+test('Innen und Aussen haben eine Festfassung, die das Weihnachtsblatt einschaltet', () => {
+  const fs = require('fs'), path = require('path');
+  for (const ort of ['innen', 'aussen']) {
+    for (const html of [R.ORTE[ort].symbol, R.ORTE[ort].silhouette]) {
+      assert.match(html, /class="ort-bild ort-alltag hat-fest"/, `${ort}: Alltag nicht als ersetzbar markiert`);
+      assert.match(html, /class="ort-bild ort-fest"/, `${ort}: keine Festfassung`);
+    }
+  }
+  // Der Schneemann im Schneefall, nicht die drehende Sonne.
+  const fest = R.ORTE.aussen.silhouette.split('class="ort-bild ort-fest"')[1];
+  assert.ok(fest.includes('ort-flocken') && !fest.includes('ort-strahlen'));
+  // Treppe und Sofa haben keine -- sie bleiben stehen, statt zu verschwinden.
+  for (const ort of ['treppenhaus', 'wohnzimmer']) assert.ok(!R.ORTE[ort].silhouette.includes('hat-fest'));
+  // Ab Werk aus (auch im Editor, der das Weihnachtsblatt nicht laedt), eingeschaltet nur dort.
+  const alltag = fs.readFileSync(path.join(__dirname, '../renderer/shared/dashboard.css'), 'utf8');
+  const festblatt = fs.readFileSync(path.join(__dirname, '../renderer/shared/anlass.css'), 'utf8');
+  assert.match(alltag, /\.ort-bild\.ort-fest \{ display: none; \}/);
+  assert.match(festblatt, /body\.anlass-weihnachten \.ort-bild\.ort-fest \{ display: block; \}/);
+  assert.match(festblatt, /body\.anlass-weihnachten \.ort-bild\.ort-alltag\.hat-fest \{ display: none; \}/);
+});

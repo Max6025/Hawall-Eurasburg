@@ -1041,9 +1041,77 @@ function anlassAnwenden(erzwingen) {
   AnlassModul.schichtSetzen($('anlassSchicht'), z, { flocken: 36, szene: 'klein' });
   if (!innen) { innen = document.createElement('div'); bs.appendChild(innen); }
   AnlassModul.schichtSetzen(innen, z, { flocken: 48, szene: 'gross' });
-  if (schoner) schoner.farbenSetzen(z.anlass === 'weihnachten' ? AnlassModul.BUEHNE_TOENE_WEIHNACHTEN : null);
+  if (schoner) {
+    schoner.farbenSetzen(z.anlass === 'weihnachten' ? AnlassModul.BUEHNE_TOENE_WEIHNACHTEN : null);
+    // Unter deckend bunten Karten ist die Buehne nur Last -- siehe buehneSperren().
+    schoner.buehneSperren(z.anlass === 'weihnachten');
+  }
+  // Die Auftritte (Schlitten, Weihnachtsmann, Rudolf ...) haengen an den eben neu gebauten
+  // Elementen -- die alten Zeitgeber muessen weg, bevor es neue gibt.
+  if (anlassGaeste.vorn) anlassGaeste.vorn.stoppen();
+  if (anlassGaeste.schoner) anlassGaeste.schoner.stoppen();
+  anlassGaeste = { vorn: null, schoner: null };
+  if (z.anlass === 'weihnachten') {
+    // Vorn (das Dashboard): Wer das Panel angetippt hat, steht eine Minute davor, dann liegt
+    // der Schoner wieder. Der erste Auftritt kommt deshalb bald, sonst sieht ihn dort niemand.
+    // Und NUR hier klingt etwas dazu -- der Schoner bleibt still.
+    anlassGaeste.vorn = new AnlassModul.Auftritte($('anlassSchicht'),
+      { szene: 'klein', ersterMin: 5, ersterMax: 16, warteMin: 22, warteMax: 70, beiAuftritt: anlassTonSpielen });
+    anlassGaeste.schoner = new AnlassModul.Auftritte(innen,
+      { szene: 'gross', ersterMin: 20, ersterMax: 70, warteMin: 50, warteMax: 190 });
+  }
+  anlassGaesteAnpassen();
   // Hell/Dunkel haengt am Anlass: Zu Weihnachten gibt es kein helles Glas-Design.
   applyTheme();
+}
+
+// Die Auftritte laufen nur in der Schicht, die gerade zu sehen ist: liegt der Schoner, in
+// seiner; sonst vorn. Gerufen nach jedem Hinlegen und Aufstehen und nach jedem Neubau. Ohne
+// "Hintergrund langsam bewegen" laeuft keiner.
+let anlassGaeste = { vorn: null, schoner: null };
+function anlassGaesteAnpassen() {
+  const still = document.body.classList.contains('ohne-bewegung')
+    || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const liegt = !!(schoner && schoner.istSichtbar());
+  const schalten = (gaeste, an) => { if (gaeste) { if (an) gaeste.starten(); else gaeste.stoppen(); } };
+  schalten(anlassGaeste.vorn, !still && !liegt);
+  schalten(anlassGaeste.schoner, !still && liegt);
+}
+
+// --- Die Geraeusche zum Weihnachtsdesign ---------------------------------------------------------
+//
+// Gewuenscht: ein Geraeusch, wenn der Schlitten vorbeifliegt oder der Weihnachtsmann auftaucht --
+// abschaltbar, und NUR auf dem eigentlichen Bildschirm. Liegt der Schoner, bleibt die Wand
+// still und zeigt nur die Bewegung: Eine Wand, die den ganzen Tag von selbst klingelt, schaltet
+// am zweiten Tag jemand ab.
+//
+// Vier Bedingungen, alle hier an einer Stelle:
+//   1. nur auf dem PANEL (in der Live-Ansicht klingelte sonst das Notebook),
+//   2. nur wenn eingeschaltet (anlassTon, ab Werk an),
+//   3. nur wenn der Schoner NICHT liegt,
+//   4. nur fuer Auftritte, die einen Ton haben.
+// `erzwingen` (der Knopf "Auf der Wand abspielen") uebergeht 2 und 3, nicht 1.
+const ANLASS_TON_SYSTEM_MINDESTENS = 25; // Prozent; angehoben wird wie beim Akku-Warnton nur nach oben
+let anlassTonLautGesetzt = false;
+function anlassTonSpielen(name, info, erzwingen) {
+  const ton = (info && info.ton) || (AnlassModul.AUFTRITTE[name] && AnlassModul.AUFTRITTE[name].ton);
+  if (!IM_PANEL || !ton) return false;
+  if (!erzwingen && (!config || config.anlassTon === false)) return false;
+  if (!erzwingen && schoner && schoner.istSichtbar()) return false;
+  try {
+    if (!tonKontext) tonKontext = new (window.AudioContext || window.webkitAudioContext)();
+    if (tonKontext.state === 'suspended') tonKontext.resume();
+    // Ein stummes Panel ist von einem funktionierenden nicht zu unterscheiden (siehe Akku-Ton).
+    // Einmal je Start auf eine leise Mindestlautstaerke heben -- gesenkt wird nie.
+    if (!anlassTonLautGesetzt && window.wallApi && window.wallApi.systemLautstaerkeAnheben) {
+      anlassTonLautGesetzt = true;
+      window.wallApi.systemLautstaerkeAnheben(ANLASS_TON_SYSTEM_MINDESTENS);
+    }
+    AnlassModul.tonSpielen(tonKontext, ton, { dauer: info && info.dauer ? info.dauer * 0.7 : 5, richtung: (info && info.richtung) || 1 });
+    return true;
+  } catch (e) {
+    return false;
+  }
 }
 
 // Zu Weihnachten gibt es KEIN helles Design: Die Karten sind deckend bunt und tragen immer
@@ -1400,6 +1468,13 @@ function befehleEmpfangen() {
     let befehl;
     try { befehl = JSON.parse(e.data); } catch (err) { return; }
     if (befehl && befehl.befehl === 'ton') akkuTonSpielen(true);
+    // "Weihnachtston auf der Wand abspielen": der Schlitten fliegt einmal vorbei, mit Schellen --
+    // auch wenn gerade der Schoner liegt, denn wer den Knopf drueckt, will es hoeren.
+    if (befehl && befehl.befehl === 'anlass-ton') {
+      const gaeste = (schoner && schoner.istSichtbar()) ? anlassGaeste.schoner : anlassGaeste.vorn;
+      if (gaeste) gaeste.auftreten('schlitten');
+      anlassTonSpielen('schlitten', { ton: 'schellen', dauer: 8, richtung: 1 }, true);
+    }
   };
 }
 
@@ -1564,12 +1639,14 @@ function schonerPruefen() {
   if (schonen) {
     schonerHintergrundAnwenden();
     schoner.zeigen();
+    anlassGaesteAnpassen();
     // ERST zeigen, DANN aufraeumen. Der Schoner liegt auf z-index 9990 und deckt das
     // Dashboard vollstaendig ab -- der Wechsel passiert also hinter ihm und ist nicht zu
     // sehen. Umgekehrt saehe man ihn: einen Augenblick das Hauptdashboard, dann den Schoner.
     hinterDemSchonerAufraeumen();
   } else {
     schoner.verbergen();
+    anlassGaesteAnpassen();
   }
   // Erst umschalten, dann rechnen: helligkeitAnpassen() liest den GESAMTEN Zustand, nicht das
   // letzte Ereignis.
@@ -1707,6 +1784,7 @@ function schonerWecken() {
   letzteBedienung = Date.now();
   if (!schoner || !schoner.istSichtbar()) return;
   schoner.verbergen();
+  anlassGaesteAnpassen();
   helligkeitAnpassen();
   // Wer aufweckt, soll aktuelle Zahlen sehen und nicht den Stand von vor einer Stunde. Der
   // Bedien-Schutz wuerde den Neuaufbau sonst verschieben -- genau wie beim Dashboardwechsel.

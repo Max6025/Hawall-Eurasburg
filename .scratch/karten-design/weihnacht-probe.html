@@ -14,8 +14,9 @@
     ?dashboard          -- das Dashboard: kleine Szene, unten der Streifen mit der Uhr
     ?tag                -- Tag statt Nacht (nur auf dem Dashboard; der Schoner ist immer Nacht)
     ?datum=2026-12-06   -- ein anderer Tag: Nikolaus, zwei Kerzen, andere Zahl auf dem Schild
-    ?schnell            -- Schlitten und Gaeste kommen alle paar Sekunden statt alle zwei Minuten
-    ?steh               -- Schlitten und Gaeste stehen im Bild, zum Ansehen der Zeichnung
+    ?schnell            -- die Auftritte kommen alle paar Sekunden statt alle ein, zwei Minuten
+    ?auftritt=rudolf    -- immer derselbe Auftritt (schlitten, figur, kranz, rudolf, schnuppe, fallschirm)
+    ?steh               -- alle Auftritte stehen im Bild, zum Ansehen der Zeichnungen
     ?still              -- "Hintergrund langsam bewegen" aus: nur, was stillsteht
     ?aus                -- ohne Anlass, zum Vergleich
 
@@ -102,17 +103,35 @@ if (alsDashboard) {
   if (!P.has('still')) buehne.starten();
 }
 
-if (P.has('schnell')) {
-  schicht.style.setProperty('--anlass-takt-schlitten', '24s');
-  schicht.style.setProperty('--anlass-takt-ecke', '20s');
-  // Die Wartezeit vor dem ersten Auftritt gleich mit kuerzen.
-  schicht.querySelectorAll('.anlass-schlitten').forEach(e => e.style.animationDelay = '1s');
-  schicht.querySelectorAll('.anlass-figur').forEach(e => e.style.animationDelay = '1s');
-  schicht.querySelectorAll('.anlass-kranz').forEach(e => e.style.animationDelay = '11s');
+// Die Auftritte: wie auf der Wand per Zeitgeber, hier nur schneller.
+//   ?schnell          -- alle paar Sekunden einer
+//   ?auftritt=rudolf  -- immer derselbe (schlitten, figur, kranz, rudolf, schnuppe, fallschirm)
+//   ?steh             -- alle stehen im Bild, zum Ansehen der Zeichnungen
+const gaeste = new AnlassModul.Auftritte(schicht, {
+  szene: alsDashboard ? 'klein' : 'gross',
+  ersterMin: 1, ersterMax: 2,
+  warteMin: P.has('schnell') || P.has('auftritt') ? 3 : 40, warteMax: P.has('schnell') || P.has('auftritt') ? 6 : 120
+});
+if (P.get('auftritt')) {
+  const nur = P.get('auftritt');
+  setInterval(() => gaeste.auftreten(nur), 4000); gaeste.auftreten(nur);
+} else if (!P.has('still') && !P.has('steh') && zustand.anlass) {
+  gaeste.starten();
 }
+window.probeGaeste = gaeste;
 if (P.has('steh')) {
-  schicht.querySelectorAll('.anlass-ecke').forEach(e => { e.style.animation = 'none'; e.style.transform = 'translate3d(0, 8%, 0)'; });
-  schicht.querySelectorAll('.anlass-schlitten').forEach(e => { e.style.animation = 'none'; e.style.transform = 'translate3d(34vw, 2vh, 0) rotate(-2deg)'; });
+  const lage = {
+    schlitten: 'translate3d(34vw, 2vh, 0) rotate(-2deg)', figur: 'translate3d(0, 8%, 0)', kranz: 'translate3d(0, 0, 0)',
+    rudolf: 'translate3d(24%, 0, 0)', schnuppe: 'rotate(-24deg) translate3d(-10vh, 0, 0)', fallschirm: 'translate3d(0, 30vh, 0)'
+  };
+  schicht.querySelectorAll('[data-auftritt]').forEach(e => {
+    e.classList.add('laeuft'); e.style.animation = 'none'; e.style.opacity = '1';
+    e.style.transform = lage[e.dataset.auftritt] || 'none';
+    if (e.dataset.auftritt === 'schnuppe') { e.style.setProperty('--x', '60vw'); e.style.setProperty('--hoehe', '30vh'); }
+    if (e.dataset.auftritt === 'fallschirm') e.style.setProperty('--x', '48vw');
+    if (e.dataset.auftritt === 'rudolf') e.style.setProperty('--hoehe', '36vh');
+    if (e.dataset.auftritt === 'figur' && alsDashboard) e.style.setProperty('--x', '78vw');
+  });
 }
 document.getElementById('stand').textContent = zustand.anlass
   ? `${tag.toLocaleDateString('de-DE')} · ${zustand.advent}. Advent · ${zustand.figur} · ${zustand.schild.gross}`

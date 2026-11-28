@@ -71,6 +71,7 @@ async function load() {
   $('desktopHintergrund').checked = !!configRes.desktopHintergrund;
   if (configRes.rueckkehrSekunden !== undefined) $('rueckkehrSekunden').value = configRes.rueckkehrSekunden;
   $('anlassDesign').value = configRes.anlassDesign || 'auto';
+  $('anlassTon').checked = configRes.anlassTon !== false;
 
   // Der Zugriffsschluessel kommt ausdruecklich NICHT zurueck (siehe /api/config) -- das Feld
   // bleibt leer und heisst "unveraendert". Ohne diesen Hinweis sieht es aus, als waere keiner
@@ -195,6 +196,7 @@ function alleFelder() {
     hintergrundBewegung: $('hintergrundBewegung').checked,
     desktopHintergrund: $('desktopHintergrund').checked,
     anlassDesign: $('anlassDesign').value,
+    anlassTon: $('anlassTon').checked,
     rueckkehrSekunden: zahl('rueckkehrSekunden', 90),
     sunEntity: $('sunEntity').value,
     notifyEntity: $('notifyEntity').value,
@@ -379,3 +381,36 @@ if (wmPruefen) {
     }
   });
 }
+
+// --- Weihnachtston ausprobieren -------------------------------------------------------------------
+//
+// Zwei Knoepfe, weil es zwei Fragen sind: "Wie klingt das?" beantwortet der Browser, in dem man
+// gerade sitzt -- dieselbe Rechnung wie auf der Wand (AnlassModul.tonSpielen). "Kommt es auf
+// der Wand an?" beantwortet nur die Wand; dort fliegt dazu der Schlitten einmal vorbei.
+(function () {
+  const ergebnis = (text, gut) => { $('anlassTonErgebnis').textContent = text; $('anlassTonErgebnis').className = 'result ' + (gut ? 'ok' : 'err'); };
+  let kontext = null;
+  $('anlassTonHier').addEventListener('click', () => {
+    try {
+      if (!kontext) kontext = new (window.AudioContext || window.webkitAudioContext)();
+      if (kontext.state === 'suspended') kontext.resume();
+      // Erst die Schellen des Schlittens, danach das Glockenspiel des Weihnachtsmanns.
+      const r = AnlassModul.tonSpielen(kontext, 'schellen', { dauer: 4 });
+      setTimeout(() => AnlassModul.tonSpielen(kontext, 'glockenspiel'), r.ende * 1000 + 300);
+      ergebnis('Erst die Schellen (Schlitten), dann das Glockenspiel (Weihnachtsmann).', true);
+    } catch (e) {
+      ergebnis('Dieser Browser gibt keinen Ton her: ' + String(e && e.message || e), false);
+    }
+  });
+  $('anlassTonWand').addEventListener('click', async () => {
+    try {
+      const r = await fetch('/api/anzeige/anlass-ton', { method: 'POST' }).then(x => x.json());
+      if (!r.ok) return ergebnis('Fehler: ' + (r.error || 'unbekannt'), false);
+      ergebnis(r.anzeigen > 0
+        ? 'Abgeschickt – auf der Wand fliegt jetzt der Schlitten vorbei, mit Schellen.'
+        : 'Es hört gerade keine Anzeige zu – läuft das Wall Display?', r.anzeigen > 0);
+    } catch (e) {
+      ergebnis('Nicht erreichbar: ' + String(e && e.message || e), false);
+    }
+  });
+})();

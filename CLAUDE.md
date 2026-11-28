@@ -1507,6 +1507,52 @@ Was daran Technik ist:
 - **Ohne „Hintergrund langsam bewegen" bleibt, was stillsteht**: bunte Karten, Girlande, Szene.
   Schnee, Schlitten und die Gäste gibt es nur bewegt.
 
+**Flüssig heißt: nur die Grafikeinheit bewegt** (seit 1.0.42 — und das gilt für JEDE neue
+Animation hier, nicht nur für Weihnachten). Die Vorgabe: *„Animationen müssen flüssig laufen,
+ohne Ruckeln, ohne Hängen, ohne langsam zu werden. Auch wenn man den Bildschirm antippt."*
+1.0.41 hat das nicht geleistet, und die Messung auf dem Surface Go sagt, warum: **198 % eines
+Kerns und 46 % der Grafikeinheit**, dauerhaft. Schuld waren Bewegungen **innerhalb von
+SVG-Zeichnungen** (Baumlichter, Winken, Flammen, Rauch, die Strahlen der Sonne) samt
+Schlagschatten darauf: Die rechnet der Browser auf dem Hauptstrang und zeichnet für jedes Bild
+die ganze Zeichnung neu. Fünf Regeln, jede mit Test:
+1. **Bewegt wird nur HTML, nie eine Form in einem SVG.** Jede Zeichnung ist ein Kasten
+   (`.anlass-bild`, `.ort-bild`): das stehende SVG, daneben die bewegten Teile als eigene
+   Elemente, in Prozent daraufgelegt. Das gilt auch für die **Ortszeichen** der Karten.
+2. **Nur `transform` und `opacity`.** Alles andere (Farbe, Größe, Schatten) rechnet der
+   Hauptstrang.
+3. **Kein Filter auf etwas Bewegtem** — ein Schlagschatten nur am stehenden SVG.
+4. **Was verdeckt ist, wird nicht gezeichnet**: Die Schicht unter dem liegenden Schoner ist
+   `visibility: hidden`, nicht nur angehalten. Und die großen weichgezeichneten Flächen des
+   Alltags (`.lebendig`, die Bühne) sind zu Weihnachten aus — unter deckend bunten Karten sieht
+   man sie nicht (`buehneSperren()`).
+5. **Nachmessen statt behaupten**: `werkzeuge/last-messen.ps1` auf dem Panel (per SSH) nennt
+   CPU, Speicher und GPU der App über zwanzig Sekunden. Im Browser sagt
+   `document.getAnimations()`, ob ein Ziel ein `SVGElement` ist.
+
+**Die Auftritte kommen gewürfelt** (`Auftritte` in `anlass.js`). Gewünscht: *„dass ab und zu, in
+unregelmäßigen Zeitabschnitten, der Weihnachtsmann da so rumfliegt"* und *„vielleicht noch ein
+paar mehr Animationen"*. Ein Zeitgeber würfelt, **wann** der nächste Auftritt ist, **welcher**
+(Schlitten, Weihnachtsmann/Nikolaus, Rudolf vom Rand, Sternschnuppe, Geschenk am Fallschirm, auf
+dem Dashboard auch der Adventskranz) und dazu Höhe, Seite und Tempo — nie derselbe zweimal
+hintereinander. JavaScript **löst nur aus** (eine Klasse), die Bewegung bleibt eine einmalige
+CSS-Animation. Der Zeitgeber läuft nur in der Schicht, die zu sehen ist
+(`anlassGaesteAnpassen()` nach jedem Hinlegen und Aufstehen). Auf dem Dashboard kommt der erste
+Auftritt nach wenigen Sekunden: Wer das Panel antippt, steht eine Minute davor, dann liegt der
+Schoner wieder.
+
+**Geräusche nur auf dem Dashboard** (`tonSpielen()`, `anlassTonSpielen()`): Schlittenschellen
+zum Schlitten, ein Glockenspiel zum Weihnachtsmann, zwei Glöckchen zu Rudolf, ein Glitzern zur
+Sternschnuppe. Gewünscht war ausdrücklich: abschaltbar (`anlassTon`), und im Bildschirmschoner
+**still** — dort läuft nur die Bewegung. Die Schicht im Schoner hat deshalb gar keinen
+Ton-Rückruf. Gerechnet, nicht abgespielt (wie der Akku-Ton). **Ich kann sie nicht hören** —
+geprüft ist nur, dass sie erklingen, nicht übersteuern (Spitze 0,3) und rechtzeitig enden; ob
+sie *gefallen*, sagt nur der Knopf „Hier anhören" auf der Design-Seite.
+
+**Die Ortszeichen haben eine Festfassung**: Auf dem Hausdach liegt Schnee (und im Fenster
+brennt Licht), statt der drehenden Sonne steht ein Schneemann im Schneefall. Beide Fassungen
+stehen immer im Markup; `anlass.css` schaltet um. So muss keine Karte neu gebaut werden, und
+`buildCard()` weiß nichts vom Anlass.
+
 Ansehen: `.scratch/karten-design/weihnacht-probe.html` zeigt den Schoner (die Fläche, die fast
 immer zu sehen ist), `?dashboard` das Dashboard, `?tag`, `?datum=2026-12-06`, `?schnell`,
 `?steh`, `?still`, `?aus`. **Alle** Kartentypen im Weihnachtskleid zeigt
@@ -1527,7 +1573,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-677 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+690 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

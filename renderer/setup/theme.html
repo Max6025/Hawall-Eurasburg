@@ -56,6 +56,20 @@
       Nikolaus. Der Adventskranz zeigt, der wievielte Advent ist. Ohne „Hintergrund langsam
       bewegen“ bleibt nur das, was stillsteht.</p>
 
+    <label style="display:flex; align-items:center; gap:0.6rem;">
+      <input type="checkbox" id="anlassTon" style="width:auto; margin:0;" checked>
+      Geräusche dazu (Schlittenschellen, Glockenspiel)
+    </label>
+    <p class="hint-text">Wenn der Schlitten vorbeifliegt oder der Weihnachtsmann auftaucht, klingt
+      es kurz – aber <strong>nur auf dem Dashboard</strong>, also solange jemand davorsteht.
+      Liegt der Bildschirmschoner, bleibt die Wand still und zeigt nur die Bewegung. Ist das
+      Panel stumm, wird die Systemlautstärke einmal leise angehoben (25 %), gesenkt wird nie.</p>
+    <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.4rem;">
+      <button type="button" id="anlassTonHier" style="margin:0;">Hier anhören</button>
+      <button type="button" id="anlassTonWand" style="margin:0;">Auf der Wand abspielen</button>
+    </div>
+    <div id="anlassTonErgebnis" class="result"></div>
+
     <label style="display:flex; align-items:center; gap:0.6rem; margin-top:1.2rem;">
       <input type="checkbox" id="desktopHintergrund" style="width:auto; margin:0;">
       Windows-Desktop im selben Design
@@ -302,6 +316,7 @@
   <!-- Wegen ankuendigungsText(): Die Vorschau muss GENAU dieselbe Regel anwenden wie die
      Anzeige, sonst sagt sie etwas anderes voraus, als spaeter passiert. -->
 <script src="/shared/dashboard-render.js"></script>
+<script src="/shared/anlass.js"></script>
 <script src="theme.js"></script>
 </body>
 </html>

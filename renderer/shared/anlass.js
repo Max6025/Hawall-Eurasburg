@@ -39,11 +39,6 @@
   'use strict';
 
   const FLOCKEN_VORGABE = 34;
-  // Wer wann vorbeikommt, in Sekunden. Die Zahlen stehen als CSS-Variablen an der Schicht, damit
-  // die Probe sie kürzen kann -- zwei Minuten auf einen Schlitten warten will beim Hinsehen
-  // niemand.
-  const TAKT_SCHLITTEN = 150;
-  const TAKT_ECKE = 120;
   // Die Girlande hängt in so vielen Bögen. Die Zahl steht auch im CSS nirgends ein zweites Mal:
   // Alle Lagen (Schleifen, Lichter, Anhänger) werden hier in Prozent ausgerechnet.
   const BOEGEN = 8;
@@ -155,10 +150,46 @@
   //
   // Flache, runde Formen ohne Konturen: Sie müssen aus fünf Metern als "Weihnachtsmann" zu
   // lesen sein und dürfen aus der Nähe nicht nach Clipart aussehen.
+  //
+  // WAS SICH BEWEGT, IST HTML UND LIEGT ÜBER DER ZEICHNUNG -- NIE IN IHR. Das ist die Lehre aus
+  // 1.0.41 und der wichtigste Satz dieser Datei. Dort winkte der Handschuh als Gruppe IM SVG,
+  // die Baumlichter funkelten als Kreise IM SVG, und jedes dieser SVGs trug einen Schlagschatten
+  // (filter). Eine Bewegung in einem SVG rechnet der Browser auf dem Hauptstrang: Er zeichnet
+  // für jedes Bild die ganze Zeichnung neu, samt Filter. Auf dem Surface Go gemessen: 198 %
+  // eines Kerns und 46 % der Grafikeinheit -- und gemeldet wurde es als Ruckeln. Die Vorgabe
+  // dazu ist eindeutig: "Animationen müssen flüssig laufen, ohne Ruckeln, ohne Hängen, ohne
+  // langsam zu werden. Auch wenn man den Bildschirm antippt."
+  //
+  // Deshalb ist jede Zeichnung ein Kasten (.anlass-bild): das STEHENDE SVG und daneben die
+  // bewegten Teile (.anlass-teil) als eigene HTML-Elemente, in Prozent des Kastens daraufgelegt.
+  // Ein HTML-Element, das nur transform und opacity ändert, bewegt die Grafikeinheit allein --
+  // auch während der Hauptstrang gerade Karten neu baut. Ein Test hält fest, dass im ganzen
+  // Markup kein `anlass-bewegt` innerhalb eines <svg> steht.
 
   const ROT = '#d42b3c', ROT_TIEF = '#a81d2c', GOLD = '#f2c14e', HAUT = '#f6c9a8', WEISS = '#ffffff';
   const GRUEN = '#1f8a52', GRUEN_TIEF = '#14633a';
-  const SVG = (vb, inhalt, attr) => `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg"${attr || ''}>${inhalt}</svg>`;
+  const pz = (v, von) => (v / von * 100).toFixed(2) + '%';
+
+  /** Ein Kasten: das stehende SVG, dahinter und davor die bewegten Teile. */
+  function bild(b, h, zeichnung, davor, dahinter, attr) {
+    return `<span class="anlass-bild"${attr || ''}>${dahinter || ''}` +
+      `<svg viewBox="0 0 ${b} ${h}" xmlns="http://www.w3.org/2000/svg">${zeichnung}</svg>${davor || ''}</span>`;
+  }
+  /**
+   * Ein bewegtes Teil mit eigener kleiner Zeichnung. b/h: Maße des ganzen Kastens;
+   * x/y/w/t: der Ausschnitt, den das Teil einnimmt (zugleich der viewBox seiner Zeichnung);
+   * ursprung: Drehpunkt in den Koordinaten des Kastens.
+   */
+  function teil(klasse, b, h, x, y, w, t, zeichnung, ursprung) {
+    const dreh = ursprung ? `;transform-origin:${pz(ursprung[0] - x, w)} ${pz(ursprung[1] - y, t)}` : '';
+    return `<i class="anlass-teil anlass-bewegt ${klasse}" style="left:${pz(x, b)};top:${pz(y, h)};width:${pz(w, b)};height:${pz(t, h)}${dreh}">` +
+      `<svg viewBox="${x} ${y} ${w} ${t}" xmlns="http://www.w3.org/2000/svg">${zeichnung}</svg></i>`;
+  }
+  /** Ein bewegter runder Fleck ohne eigene Zeichnung: Licht, Nase, Rauch, Funke. */
+  function fleck(klasse, b, h, cx, cy, r, farbe) {
+    return `<i class="anlass-teil anlass-fleck anlass-bewegt ${klasse}" style="left:${pz(cx - r, b)};top:${pz(cy - r, h)};` +
+      `width:${pz(2 * r, b)};height:${pz(2 * r, h)};background:${farbe}"></i>`;
+  }
 
   const GESICHT =
     `<path d="M30 76 C27 112 46 128 60 128 C74 128 93 112 90 76 C80 90 40 90 30 76Z" fill="${WEISS}"/>` +
@@ -170,23 +201,30 @@
     `<circle cx="60" cy="80" r="5.4" fill="#ea8f7d"/>`;
 
   // Der Weihnachtsmann: Zipfelmütze, deren Bommel zur Seite fällt, und ein Handschuh, der winkt.
-  const WEIHNACHTSMANN = SVG('0 0 124 130',
-    `<g class="anlass-winken anlass-bewegt"><path d="M4 100 C0 82 8 70 16 72 C24 74 27 86 25 100Z" fill="${ROT}"/>` +
-    `<circle cx="27" cy="86" r="6" fill="${ROT}"/><rect x="2" y="97" width="26" height="11" rx="5.5" fill="${WEISS}"/></g>` +
+  // Der Handschuh ist das bewegte Teil und liegt HINTER dem Kopf.
+  const WEIHNACHTSMANN = bild(124, 130,
     `<path d="M30 58 Q38 10 78 13 Q106 17 110 56 L99 55 Q95 33 83 33 Q91 44 91 58Z" fill="${ROT}"/>` +
     `<path d="M83 33 Q91 44 91 58 L80 58 Q84 44 83 33Z" fill="${ROT_TIEF}"/>` +
     `<circle cx="106" cy="60" r="9" fill="${WEISS}"/>` +
     GESICHT +
-    `<rect x="24" y="50" width="72" height="16" rx="8" fill="${WEISS}"/>`);
+    `<rect x="24" y="50" width="72" height="16" rx="8" fill="${WEISS}"/>`,
+    '',
+    teil('anlass-winken', 124, 130, 0, 66, 36, 44,
+      `<path d="M4 100 C0 82 8 70 16 72 C24 74 27 86 25 100Z" fill="${ROT}"/>` +
+      `<circle cx="27" cy="86" r="6" fill="${ROT}"/><rect x="2" y="97" width="26" height="11" rx="5.5" fill="${WEISS}"/>`,
+      [15, 104]));
 
   // Der Nikolaus: Mitra mit Kreuz und goldenem Band, dazu der Bischofsstab. Kein Bommel.
-  const NIKOLAUS = SVG('0 0 124 130',
-    `<g class="anlass-winken anlass-bewegt"><path d="M14 128 L14 44 C14 28 34 28 34 42 C34 50 26 52 24 46" fill="none" stroke="${GOLD}" stroke-width="5" stroke-linecap="round"/></g>` +
+  const NIKOLAUS = bild(124, 130,
     `<path d="M34 60 L39 28 L60 4 L81 28 L86 60Z" fill="${ROT}"/>` +
     `<path d="M60 4 L81 28 L86 60 L60 60Z" fill="${ROT_TIEF}" opacity=".55"/>` +
     `<path d="M60 16 V46 M49 28 H71" stroke="${GOLD}" stroke-width="4.5" stroke-linecap="round"/>` +
     GESICHT +
-    `<rect x="28" y="52" width="64" height="12" rx="6" fill="${GOLD}"/>`);
+    `<rect x="28" y="52" width="64" height="12" rx="6" fill="${GOLD}"/>`,
+    '',
+    teil('anlass-winken', 124, 130, 6, 24, 34, 106,
+      `<path d="M14 128 L14 44 C14 28 34 28 34 42 C34 50 26 52 24 46" fill="none" stroke="${GOLD}" stroke-width="5" stroke-linecap="round"/>`,
+      [14, 128]));
 
   // Der Schlitten: zwei Rentiere im Galopp, vorn Rudolf, dahinter der Schlitten mit Sack.
   function rentier(x, rudolf) {
@@ -199,16 +237,11 @@
       `<path d="M56 21 L53 9 M53 14 L48 10 M53 13 L58 9 M61 21 L64 10 M64 14 L69 11" stroke="${g}" stroke-width="2.2" stroke-linecap="round" fill="none"/>` +
       `<circle cx="62" cy="25.5" r="1.3" fill="#2b2b33"/>` +
       `<circle cx="10" cy="40" r="3.4" fill="${WEISS}"/>` +
-      (rudolf
-        ? `<circle class="anlass-nase anlass-bewegt" cx="68.5" cy="28" r="3.3" fill="#ff3b30"/>`
-        : `<circle cx="68.5" cy="28" r="2.4" fill="#3a2a22"/>`) +
+      `<circle cx="68.5" cy="28" r="2.4" fill="${rudolf ? '#c8102e' : '#3a2a22'}"/>` +
       `</g>`;
   }
-  const SCHLITTEN = SVG('0 0 330 96',
-    `<g fill="${GOLD}"><circle class="anlass-funke anlass-bewegt f1" cx="14" cy="46" r="2.6"/>` +
-    `<circle class="anlass-funke anlass-bewegt f2" cx="34" cy="60" r="2"/>` +
-    `<circle class="anlass-funke anlass-bewegt f3" cx="52" cy="40" r="3"/>` +
-    `<circle class="anlass-funke anlass-bewegt f2" cx="70" cy="66" r="1.8"/></g>` +
+  // Rudolfs Nase und der Sternenstaub hinter dem Schlitten sind die bewegten Teile.
+  const SCHLITTEN = bild(330, 96,
     `<ellipse cx="108" cy="34" rx="15" ry="18" fill="#7a4b2a"/>` +
     `<path d="M98 22 Q108 12 118 22" stroke="${GOLD}" stroke-width="3" fill="none" stroke-linecap="round"/>` +
     `<circle cx="136" cy="30" r="14" fill="${ROT}"/>` +
@@ -220,56 +253,58 @@
     `<path d="M100 62 L98 74 M150 62 L152 74" stroke="${GOLD}" stroke-width="3"/>` +
     `<path d="M78 70 Q74 78 88 78 L166 78 Q180 78 182 66" stroke="${GOLD}" stroke-width="4" fill="none" stroke-linecap="round"/>` +
     `<path d="M168 38 Q210 52 244 40 Q270 34 300 36" stroke="${GOLD}" stroke-width="1.4" fill="none" opacity=".85"/>` +
-    rentier(180, false) + rentier(250, true));
+    rentier(180, false) + rentier(250, true),
+    fleck('anlass-nase', 330, 96, 318.5, 28, 3.6, '#ff3b30') +
+    fleck('anlass-funke f1', 330, 96, 14, 46, 2.8, GOLD) + fleck('anlass-funke f2', 330, 96, 34, 60, 2.2, GOLD) +
+    fleck('anlass-funke f3', 330, 96, 52, 40, 3.2, GOLD) + fleck('anlass-funke f2', 330, 96, 70, 66, 2, GOLD));
 
-  // Der Adventskranz: vier Kerzen, so viele brennen, wie Advent ist.
+  // Der Adventskranz: vier Kerzen, so viele brennen, wie Advent ist. Die Flammen sind die
+  // bewegten Teile, jede ein eigenes kleines Bild mit dem Drehpunkt am Docht.
   function adventskranzSvg(kerzen) {
     const n = Math.max(0, Math.min(4, Number(kerzen) || 0));
     const plaetze = [[24, 46], [52, 38], [80, 38], [108, 46]];
-    let kerzenSvg = '';
+    let kerzenSvg = '', flammen = '';
     plaetze.forEach(([x, y], i) => {
-      const brennt = i < n;
       kerzenSvg +=
         `<rect x="${x - 6}" y="${y}" width="12" height="${80 - y}" rx="3" fill="${ROT}"/>` +
         `<rect x="${x - 6}" y="${y}" width="5" height="${80 - y}" rx="2.5" fill="#fff" opacity=".18"/>` +
         `<path d="M${x} ${y} v-5" stroke="#3a2a22" stroke-width="1.6" stroke-linecap="round"/>` +
-        (brennt
-          ? `<circle cx="${x}" cy="${y - 12}" r="11" fill="${GOLD}" opacity=".22"/>` +
-            `<path class="anlass-flamme anlass-bewegt fl${i % 3}" d="M${x} ${y - 22} C${x + 6} ${y - 14} ${x + 5} ${y - 5} ${x} ${y - 4} C${x - 5} ${y - 5} ${x - 6} ${y - 14} ${x} ${y - 22}Z" fill="${GOLD}"/>` +
-            `<path d="M${x} ${y - 14} C${x + 2.6} ${y - 10} ${x + 2} ${y - 6} ${x} ${y - 5.4} C${x - 2} ${y - 6} ${x - 2.6} ${y - 10} ${x} ${y - 14}Z" fill="#fff6d8"/>`
-          : '');
+        (i < n ? `<circle cx="${x}" cy="${y - 12}" r="11" fill="${GOLD}" opacity=".22"/>` : '');
+      if (i < n) {
+        flammen += teil(`anlass-flamme fl${i % 3}`, 132, 108, x - 7, y - 23, 14, 20,
+          `<path d="M${x} ${y - 22} C${x + 6} ${y - 14} ${x + 5} ${y - 5} ${x} ${y - 4} C${x - 5} ${y - 5} ${x - 6} ${y - 14} ${x} ${y - 22}Z" fill="${GOLD}"/>` +
+          `<path d="M${x} ${y - 14} C${x + 2.6} ${y - 10} ${x + 2} ${y - 6} ${x} ${y - 5.4} C${x - 2} ${y - 6} ${x - 2.6} ${y - 10} ${x} ${y - 14}Z" fill="#fff6d8"/>`,
+          [x, y - 4]);
+      }
     });
     const beeren = [[18, 86], [40, 96], [66, 90], [92, 97], [116, 87], [54, 82], [80, 83]]
       .map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="${ROT}"/>`).join('');
-    return SVG('0 0 132 108',
+    return bild(132, 108,
       `<ellipse cx="66" cy="88" rx="62" ry="18" fill="#1f6b43"/>` +
       kerzenSvg +
       `<path d="M4 88 C10 104 122 104 128 88 C124 100 100 106 66 106 C32 106 8 100 4 88Z" fill="#2f8f5b"/>` +
       `<path d="M8 84 q8 -8 16 0 q8 -8 16 0 q8 -8 16 0 q8 -8 16 0 q8 -8 16 0 q8 -8 16 0 q8 -8 12 0" stroke="#2f8f5b" stroke-width="5" fill="none" stroke-linecap="round" opacity=".9"/>` +
-      beeren, ` data-kerzen="${n}"`);
+      beeren, flammen, '', ` data-kerzen="${n}"`);
   }
 
   // Der Tannenbaum: drei Stufen mit Schnee auf den Ästen, bunte Kugeln, ein Stern -- und Lichter,
-  // die funkeln. Die Lichter sind die einzigen bewegten Teile.
+  // die funkeln. Lichter und Stern sind die bewegten Teile.
   const BAUM_LICHTER = [[50, 34, '#ffd166'], [38, 54, '#ff5a5f'], [63, 58, '#6fb8ff'], [30, 84, '#ffd166'],
     [52, 80, '#ff7bd5'], [72, 88, '#5fd38d'], [22, 114, '#6fb8ff'], [44, 110, '#ff5a5f'], [64, 116, '#ffd166'], [82, 112, '#ff7bd5']];
-  const TANNENBAUM = SVG('0 0 100 150',
+  const TANNENBAUM = bild(100, 150,
     `<rect x="43" y="124" width="14" height="22" rx="2" fill="#7a4b2a"/>` +
     `<path d="M50 14 L78 62 L66 60 L88 98 L72 95 L96 132 L4 132 L28 95 L12 98 L34 60 L22 62Z" fill="${GRUEN}"/>` +
     `<path d="M50 14 L78 62 L66 60 L88 98 L72 95 L96 132 L50 132Z" fill="${GRUEN_TIEF}" opacity=".55"/>` +
-    // Schnee auf den Ästen
     `<path d="M22 62 Q30 54 34 60 Q42 52 50 58 Q58 52 66 60 Q70 54 78 62 Q66 68 58 62 Q50 70 42 62 Q32 68 22 62Z" fill="#fff" opacity=".92"/>` +
     `<path d="M12 98 Q22 90 28 95 Q38 86 50 94 Q62 86 72 95 Q78 90 88 98 Q74 104 64 98 Q50 106 36 98 Q24 104 12 98Z" fill="#fff" opacity=".92"/>` +
     `<path d="M40 32 Q46 26 50 30 Q54 26 60 32 Q54 36 50 33 Q46 36 40 32Z" fill="#fff" opacity=".92"/>` +
-    // Kugeln (stehen still)
     [[42, 46, ROT], [58, 44, '#3d7df0'], [30, 76, '#b04bd6'], [70, 74, ROT], [50, 68, GOLD], [20, 122, ROT], [38, 124, '#3d7df0'], [58, 126, '#b04bd6'], [78, 124, GOLD]]
-      .map(([x, y, f]) => `<circle cx="${x}" cy="${y}" r="4.2" fill="${f}"/><circle cx="${x - 1.3}" cy="${y - 1.4}" r="1.2" fill="#fff" opacity=".7"/>`).join('') +
-    // Lichter (funkeln)
-    BAUM_LICHTER.map(([x, y, f], i) => `<circle class="anlass-baumlicht anlass-bewegt b${i % 4}" cx="${x}" cy="${y}" r="2.6" fill="${f}"/>`).join('') +
-    // Der Stern
-    `<path class="anlass-stern anlass-bewegt" d="M50 0 L53.6 9.4 L63.6 10 L55.8 16.4 L58.4 26 L50 20.6 L41.6 26 L44.2 16.4 L36.4 10 L46.4 9.4Z" fill="${GOLD}"/>`);
+      .map(([x, y, f]) => `<circle cx="${x}" cy="${y}" r="4.2" fill="${f}"/><circle cx="${x - 1.3}" cy="${y - 1.4}" r="1.2" fill="#fff" opacity=".7"/>`).join(''),
+    BAUM_LICHTER.map(([x, y, f], i) => fleck(`anlass-baumlicht b${i % 4}`, 100, 150, x, y, 2.8, f)).join('') +
+    teil('anlass-stern', 100, 150, 35, -1, 30, 28,
+      `<path d="M50 0 L53.6 9.4 L63.6 10 L55.8 16.4 L58.4 26 L50 20.6 L41.6 26 L44.2 16.4 L36.4 10 L46.4 9.4Z" fill="${GOLD}"/>`, [50, 13]));
 
-  // Die Geschenke: drei Pakete in drei Farben, jedes mit Band und Schleife.
+  // Die Geschenke: drei Pakete in drei Farben, jedes mit Band und Schleife. Steht still.
   function paket(x, y, b, h, farbe, band) {
     const mx = x + b / 2;
     return `<rect x="${x}" y="${y}" width="${b}" height="${h}" rx="2.5" fill="${farbe}"/>` +
@@ -278,15 +313,14 @@
       `<path d="M${mx} ${y} C${mx - 12} ${y - 14} ${mx - 16} ${y - 2} ${mx} ${y} C${mx + 12} ${y - 14} ${mx + 16} ${y - 2} ${mx} ${y}Z" fill="${band}"/>` +
       `<circle cx="${mx}" cy="${y}" r="2.6" fill="${band}"/>`;
   }
-  const GESCHENKE = SVG('0 0 130 76',
+  const GESCHENKE = bild(130, 76,
     paket(46, 24, 44, 50, '#2d6fe0', '#ffd166') + paket(4, 40, 46, 34, ROT, '#ffffff') + paket(84, 44, 42, 30, '#22a565', '#ff7bd5'));
 
   // Das Häuschen: Schnee auf dem Dach, zwei warme Fenster, ein Kranz an der Tür -- und aus dem
-  // Kamin steigt Rauch.
-  const HAUS = SVG('0 0 140 112',
-    `<g fill="#fff"><circle class="anlass-rauch anlass-bewegt r1" cx="103" cy="16" r="5"/>` +
-    `<circle class="anlass-rauch anlass-bewegt r2" cx="103" cy="16" r="5"/>` +
-    `<circle class="anlass-rauch anlass-bewegt r3" cx="103" cy="16" r="5"/></g>` +
+  // Kamin steigt Rauch. Bewegt: der Rauch (hinter dem Haus) und der Schein in den Fenstern.
+  const fensterSchein = (x, y) => teil('anlass-fenster', 140, 112, x, y, 18, 18,
+    `<rect x="${x}" y="${y}" width="18" height="18" rx="1.5" fill="#fff6c4"/><path d="M${x + 9} ${y} v18 M${x} ${y + 9} h18" stroke="#fff" stroke-width="2"/>`);
+  const HAUS = bild(140, 112,
     `<rect x="94" y="20" width="18" height="30" fill="#9c4a3a"/><rect x="91" y="16" width="24" height="7" rx="3.5" fill="#fff"/>` +
     `<rect x="20" y="56" width="100" height="54" rx="3" fill="#c96f4e"/>` +
     `<rect x="20" y="56" width="100" height="10" fill="#000" opacity=".12"/>` +
@@ -296,12 +330,14 @@
     `<circle cx="70" cy="84" r="5.4" fill="none" stroke="${GRUEN}" stroke-width="3"/><circle cx="70" cy="89.4" r="1.6" fill="${ROT}"/>` +
     [[30, 74], [92, 74]].map(([x, y]) =>
       `<rect x="${x - 3}" y="${y - 3}" width="24" height="24" rx="3" fill="#fff"/>` +
-      `<rect class="anlass-fenster anlass-bewegt" x="${x}" y="${y}" width="18" height="18" rx="1.5" fill="#ffd166"/>` +
-      `<path d="M${x + 9} ${y} v18 M${x} ${y + 9} h18" stroke="#fff" stroke-width="2"/>`).join(''));
+      `<rect x="${x}" y="${y}" width="18" height="18" rx="1.5" fill="#f0b83c"/>` +
+      `<path d="M${x + 9} ${y} v18 M${x} ${y + 9} h18" stroke="#fff" stroke-width="2"/>`).join(''),
+    fensterSchein(30, 74) + fensterSchein(92, 74),
+    ['r1', 'r2', 'r3'].map(k => fleck('anlass-rauch ' + k, 140, 112, 103, 14, 5.4, '#fff')).join(''));
 
-  // Der Schneemann: Zylinder, Karottennase, roter Schal -- und ein Arm, der winkt.
-  const SCHNEEMANN = SVG('0 0 92 118',
-    `<g class="anlass-arm anlass-bewegt"><path d="M66 70 L86 52 M80 57 L88 60 M80 57 L80 48" stroke="#6e452d" stroke-width="3" stroke-linecap="round" fill="none"/></g>` +
+  // Der Schneemann: Zylinder, Karottennase, roter Schal -- und ein Arm, der winkt (hinter dem
+  // Bauch angesetzt).
+  const SCHNEEMANN = bild(92, 118,
     `<path d="M26 72 L8 60 M13 63 L6 68" stroke="#6e452d" stroke-width="3" stroke-linecap="round" fill="none"/>` +
     `<circle cx="46" cy="88" r="28" fill="#fff"/><circle cx="46" cy="50" r="19" fill="#fff"/>` +
     `<path d="M46 116 A28 28 0 0 0 74 88 A30 30 0 0 1 30 111 A28 28 0 0 0 46 116Z" fill="#cfe0f5"/>` +
@@ -311,7 +347,32 @@
     `<circle cx="38" cy="58" r="1.4" fill="#2b2b33"/><circle cx="43" cy="60.4" r="1.4" fill="#2b2b33"/><circle cx="49" cy="60.4" r="1.4" fill="#2b2b33"/><circle cx="54" cy="58" r="1.4" fill="#2b2b33"/>` +
     `<circle cx="46" cy="80" r="2.6" fill="#2b2b33"/><circle cx="46" cy="92" r="2.6" fill="#2b2b33"/><circle cx="46" cy="104" r="2.6" fill="#2b2b33"/>` +
     `<rect x="26" y="29" width="40" height="6" rx="3" fill="#2b2b33"/><rect x="33" y="8" width="26" height="24" rx="2" fill="#2b2b33"/>` +
-    `<rect x="33" y="24" width="26" height="5" fill="${ROT}"/>`);
+    `<rect x="33" y="24" width="26" height="5" fill="${ROT}"/>`,
+    '',
+    teil('anlass-arm', 92, 118, 62, 44, 30, 30,
+      `<path d="M66 70 L86 52 M80 57 L88 60 M80 57 L80 48" stroke="#6e452d" stroke-width="3" stroke-linecap="round" fill="none"/>`, [66, 70]));
+
+  // Rudolf schaut vom Rand herein: Kopf, Geweih -- und die Nase, die leuchtet (bewegtes Teil).
+  const RUDOLF = bild(120, 124,
+    `<path d="M120 124 L120 60 Q100 50 78 58 L86 124Z" fill="#8a5a3c"/>` +
+    `<path d="M70 40 L64 10 M65 24 L52 14 M66 18 L78 6 M86 42 L96 14 M93 24 L106 16" stroke="#c9a27a" stroke-width="5.5" stroke-linecap="round" fill="none"/>` +
+    `<path d="M84 44 Q98 30 104 44 Q96 56 84 54Z" fill="#6e452d"/>` +
+    `<ellipse cx="58" cy="60" rx="32" ry="23" fill="#8a5a3c"/>` +
+    `<ellipse cx="38" cy="68" rx="18" ry="14" fill="#a8744f"/>` +
+    `<circle cx="64" cy="52" r="4.6" fill="#2b2b33"/><circle cx="65.6" cy="50.4" r="1.5" fill="#fff"/>` +
+    `<path d="M32 78 Q40 84 48 78" stroke="#6e452d" stroke-width="2.6" fill="none" stroke-linecap="round"/>` +
+    `<circle cx="24" cy="62" r="7.4" fill="#c8102e"/>`,
+    fleck('anlass-nase', 120, 124, 24, 62, 8.4, '#ff3b30'));
+
+  // Ein Geschenk am Fallschirm, das vom Himmel schwebt. Steht als Bild still; geschwebt und
+  // gependelt wird am Kasten.
+  const FALLSCHIRM = bild(90, 120,
+    `<path d="M6 44 Q8 6 45 4 Q82 6 84 44 Q72 34 62 44 Q52 34 45 44 Q38 34 28 44 Q18 34 6 44Z" fill="${ROT}"/>` +
+    `<path d="M28 44 Q34 14 45 4 Q56 14 62 44 Q52 34 45 44 Q38 34 28 44Z" fill="#fff" opacity=".92"/>` +
+    `<path d="M6 44 L36 88 M28 44 L41 88 M45 44 L45 88 M62 44 L49 88 M84 44 L54 88" stroke="#fff" stroke-opacity=".8" stroke-width="1.2" fill="none"/>` +
+    paket(27, 90, 36, 28, '#22a565', '#ffd166'));
+
+  const SVG = (vb, inhalt, attr) => `<svg viewBox="${vb}" xmlns="http://www.w3.org/2000/svg"${attr || ''}>${inhalt}</svg>`;
 
   // --- Die Girlande -------------------------------------------------------------------------------
   //
@@ -392,15 +453,220 @@
 
   const esc = (v) => String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
+  // --- Die Auftritte ------------------------------------------------------------------------------
+  //
+  // Gewünscht: "dass ab und zu, in unregelmäßigen Zeitabschnitten, der Weihnachtsmann da so
+  // rumfliegt -- das ist schon witzig", und "vielleicht noch ein paar mehr Animationen". Ein
+  // Auftritt ist etwas, das KOMMT UND WIEDER GEHT: der Schlitten, der Weihnachtsmann hinter
+  // dem Schnee, Rudolf vom Rand, eine Sternschnuppe, ein Geschenk am Fallschirm.
+  //
+  // In 1.0.41 lief der Schlitten als Endlosschleife im festen Takt von 150 Sekunden. Jetzt
+  // würfelt ein Zeitgeber, WANN der nächste Auftritt ist und WELCHER -- und dazu Höhe, Richtung
+  // und Tempo. JavaScript löst nur AUS (eine Klasse setzen); die Bewegung selbst bleibt eine
+  // CSS-Animation auf der Grafikeinheit. Zwischen zwei Auftritten rechnet niemand.
+  //
+  // `gewicht`: wie oft er im Verhältnis drankommt. `ton`: was dazu klingt (siehe tonSpielen).
+  const AUFTRITTE = {
+    schlitten:  { gewicht: 4, ton: 'schellen' },
+    figur:      { gewicht: 3, ton: 'glockenspiel' },
+    rudolf:     { gewicht: 2, ton: 'gloeckchen' },
+    schnuppe:   { gewicht: 2, ton: 'sternklang' },
+    fallschirm: { gewicht: 2, ton: '' },
+    kranz:      { gewicht: 2, ton: '' }
+  };
+
+  /**
+   * Welcher Auftritt als nächster? Gewichtet gewürfelt, aber nie derselbe zweimal
+   * hintereinander -- zweimal der Schlitten wirkt wie ein Hänger, nicht wie Zufall.
+   */
+  function auftrittWaehlen(namen, zuletzt, zufall) {
+    const r = zufall || Math.random;
+    let kandidaten = (namen || []).filter(n => AUFTRITTE[n]);
+    if (kandidaten.length > 1) kandidaten = kandidaten.filter(n => n !== zuletzt);
+    if (!kandidaten.length) return '';
+    const summe = kandidaten.reduce((s, n) => s + AUFTRITTE[n].gewicht, 0);
+    let wurf = r() * summe;
+    for (const n of kandidaten) { wurf -= AUFTRITTE[n].gewicht; if (wurf < 0) return n; }
+    return kandidaten[kandidaten.length - 1];
+  }
+
+  /**
+   * Wie ein Auftritt diesmal aussieht: CSS-Variablen und Klassen, einmal gewürfelt.
+   * Reine Funktion (mit austauschbarem Zufall), damit prüfbar ist, dass nichts aus dem Bild
+   * fliegt und jede Dauer in ihrem Rahmen bleibt.
+   */
+  function auftrittWuerfeln(name, szene, zufall) {
+    const r = zufall || Math.random;
+    const z = (a, b) => a + r() * (b - a);
+    const seite = r() < 0.5 ? 'von-links' : 'von-rechts';
+    switch (name) {
+      case 'schlitten': return { dauer: +z(13, 19).toFixed(1), klassen: [seite], vars: { '--hoehe': z(9, 34).toFixed(1) + 'vh' } };
+      case 'figur': return { dauer: +z(9, 13).toFixed(1), klassen: [],
+        vars: szene === 'gross' ? {} : { '--x': z(52, 84).toFixed(1) + 'vw' } };
+      case 'kranz': return { dauer: +z(11, 15).toFixed(1), klassen: [], vars: { '--x': z(3, 30).toFixed(1) + 'vw' } };
+      case 'rudolf': return { dauer: +z(6, 8.5).toFixed(1), klassen: [seite], vars: { '--hoehe': z(24, 62).toFixed(1) + 'vh' } };
+      case 'schnuppe': return { dauer: +z(1.1, 1.7).toFixed(2), klassen: [], vars: { '--x': z(38, 92).toFixed(1) + 'vw', '--hoehe': z(8, 34).toFixed(1) + 'vh' } };
+      case 'fallschirm': return { dauer: +z(12, 16).toFixed(1), klassen: [], vars: { '--x': z(8, 88).toFixed(1) + 'vw' } };
+      default: return { dauer: 10, klassen: [], vars: {} };
+    }
+  }
+
+  /**
+   * Der Zeitgeber einer Schicht. Läuft nur, solange die Schicht zu sehen ist -- starten() und
+   * stoppen() ruft, wer das weiß (dashboard.html). Gestoppt hält er KEINEN Zeitgeber.
+   *
+   * optionen: { szene, ersterMin, ersterMax, warteMin, warteMax (Sekunden), beiAuftritt(name, info) }
+   */
+  function Auftritte(schicht, optionen) {
+    this.schicht = schicht;
+    this.opt = Object.assign({ szene: 'klein', ersterMin: 8, ersterMax: 22, warteMin: 45, warteMax: 140 }, optionen || {});
+    this.zeitgeber = 0;
+    this.aktiv = false;
+    this.zuletzt = '';
+  }
+  Auftritte.prototype._planen = function (min, max) {
+    clearTimeout(this.zeitgeber);
+    this.zeitgeber = setTimeout(() => this.auftreten(), (min + Math.random() * (max - min)) * 1000);
+  };
+  /** Einen Auftritt JETZT auslösen (auch von außen: Probe, Ton-Test). Liefert den Namen. */
+  Auftritte.prototype.auftreten = function (erzwungen) {
+    if (!this.aktiv && !erzwungen) return '';
+    const elemente = Array.from(this.schicht.querySelectorAll('[data-auftritt]'));
+    const frei = elemente.filter(e => !e.classList.contains('laeuft')).map(e => e.dataset.auftritt);
+    const name = erzwungen && typeof erzwungen === 'string' ? erzwungen : auftrittWaehlen(frei, this.zuletzt);
+    const el = elemente.find(e => e.dataset.auftritt === name);
+    if (el) {
+      const w = auftrittWuerfeln(name, this.opt.szene);
+      el.classList.remove('laeuft', 'von-links', 'von-rechts');
+      Object.keys(w.vars).forEach(k => el.style.setProperty(k, w.vars[k]));
+      el.style.setProperty('--dauer', w.dauer + 's');
+      w.klassen.forEach(k => el.classList.add(k));
+      void el.offsetWidth; // Startzustand übernehmen, sonst beginnt die Animation nicht neu
+      el.classList.add('laeuft');
+      const fertig = (ev) => {
+        if (ev.target !== el) return; // Die Teile darin haben eigene Animationen
+        el.removeEventListener('animationend', fertig);
+        el.classList.remove('laeuft');
+      };
+      el.addEventListener('animationend', fertig);
+      this.zuletzt = name;
+      if (this.opt.beiAuftritt) {
+        try { this.opt.beiAuftritt(name, { dauer: w.dauer, richtung: w.klassen.includes('von-rechts') ? -1 : 1, ton: AUFTRITTE[name].ton }); } catch (e) { /* Ton ist Zugabe */ }
+      }
+    }
+    if (this.aktiv) this._planen(this.opt.warteMin, this.opt.warteMax);
+    return name;
+  };
+  Auftritte.prototype.starten = function () {
+    if (this.aktiv) return;
+    this.aktiv = true;
+    this._planen(this.opt.ersterMin, this.opt.ersterMax);
+  };
+  Auftritte.prototype.stoppen = function () {
+    this.aktiv = false;
+    clearTimeout(this.zeitgeber);
+    this.zeitgeber = 0;
+    this.schicht.querySelectorAll('[data-auftritt].laeuft').forEach(e => e.classList.remove('laeuft'));
+  };
+  Auftritte.prototype.laeuft = function () { return !!this.aktiv; };
+
+  // --- Die Geräusche ------------------------------------------------------------------------------
+  //
+  // Gewünscht: "dass ab und zu, wenn der mit seinen Rentieren vorbeifliegt, ein Geräusch
+  // macht ... oder wenn er von unten hochkommt" -- abschaltbar, und NUR auf dem eigentlichen
+  // Bildschirm: Im Bildschirmschoner bleibt die Wand still und zeigt nur die Bewegung. Die
+  // Entscheidung, OB gespielt wird, trifft dashboard.html; hier steht nur, WIE es klingt.
+  //
+  // Gerechnet, nicht abgespielt -- wie der Akku-Warnton: Eine Tondatei müsste mitgebaut und
+  // mitgeliefert werden. Schlittenschellen sind viele kurze, helle, leicht verstimmte
+  // Schläge; ein Glockenspiel ist ein Sinus mit einem unharmonischen Oberton, der schnell
+  // ausklingt.
+  //
+  // Jede Funktion plant ihre Stimmen in einen gegebenen Tonkontext und gibt zurück, wie viele
+  // es waren -- so lässt sich ohne Lautsprecher prüfen, dass überhaupt etwas geplant wurde und
+  // nichts über die Dauer hinausklingt.
+
+  /** Ein Glockenschlag: Grundton plus Obertöne, weich ein, schnell aus. */
+  function schlag(ctx, ziel, t, hz, teiltoene, laut, ausklang) {
+    let stimmen = 0;
+    teiltoene.forEach(([faktor, anteil]) => {
+      const ton = ctx.createOscillator();
+      const huelle = ctx.createGain();
+      ton.type = 'sine';
+      ton.frequency.value = hz * faktor;
+      huelle.gain.setValueAtTime(0.0001, t);
+      huelle.gain.exponentialRampToValueAtTime(Math.max(0.0002, laut * anteil), t + 0.004);
+      huelle.gain.exponentialRampToValueAtTime(0.0001, t + ausklang);
+      ton.connect(huelle); huelle.connect(ziel);
+      ton.start(t); ton.stop(t + ausklang + 0.03);
+      stimmen++;
+    });
+    return stimmen;
+  }
+  const SCHELLE = [[1, 1], [1.34, 0.7], [1.72, 0.55], [2.31, 0.4]];
+  const GLOCKENTON = [[1, 1], [2.76, 0.28], [5.4, 0.12]];
+
+  /**
+   * Die Töne. name: 'schellen' | 'glockenspiel' | 'gloeckchen' | 'sternklang'.
+   * optionen: { laut (0..1, Vorgabe 0.22), dauer (s, nur Schellen), richtung (1 = nach rechts),
+   *             zufall }
+   * Liefert { stimmen, ende } -- ende in Sekunden nach "jetzt".
+   */
+  function tonSpielen(ctx, name, optionen) {
+    const o = Object.assign({ laut: 0.22, dauer: 5, richtung: 1 }, optionen || {});
+    const r = o.zufall || Math.random;
+    const t0 = ctx.currentTime + 0.03;
+    const ausgang = ctx.createGain();
+    ausgang.gain.value = 1;
+    let ziel = ausgang, stimmen = 0, ende = 0;
+    ausgang.connect(ctx.destination);
+
+    if (name === 'schellen') {
+      // Der Schlitten zieht vorbei: von einer Seite zur anderen, erst leiser, in der Mitte am
+      // lautesten, dann wieder weg.
+      const dauer = Math.max(2, Math.min(9, o.dauer));
+      if (ctx.createStereoPanner) {
+        const lage = ctx.createStereoPanner();
+        lage.pan.setValueAtTime(-0.85 * o.richtung, t0);
+        lage.pan.linearRampToValueAtTime(0.85 * o.richtung, t0 + dauer);
+        lage.connect(ctx.destination);
+        ausgang.disconnect(); ausgang.connect(lage);
+      }
+      ausgang.gain.setValueAtTime(0.12, t0);
+      ausgang.gain.linearRampToValueAtTime(1, t0 + dauer * 0.5);
+      ausgang.gain.linearRampToValueAtTime(0.1, t0 + dauer);
+      // Galopp: zwei schnelle Schläge, eine kleine Pause.
+      for (let t = 0, i = 0; t < dauer - 0.15; i++) {
+        const hz = 2500 + r() * 700;
+        stimmen += schlag(ctx, ziel, t0 + t, hz, SCHELLE, o.laut * (i % 2 ? 0.7 : 1), 0.11 + r() * 0.05);
+        t += (i % 2 ? 0.2 : 0.13) + r() * 0.02;
+      }
+      ende = dauer + 0.2;
+    } else if (name === 'glockenspiel') {
+      // Er taucht auf: vier Töne aufwärts, C-Dur, wie eine Spieluhr.
+      [1046.5, 1318.5, 1568, 2093].forEach((hz, i) => { stimmen += schlag(ctx, ziel, t0 + i * 0.13, hz, GLOCKENTON, o.laut * 0.9, 0.75); });
+      ende = 3 * 0.13 + 0.8;
+    } else if (name === 'gloeckchen') {
+      // Rudolf: zwei helle Schläge am Halsband.
+      [0, 0.24].forEach((t, i) => { stimmen += schlag(ctx, ziel, t0 + t, 1760, GLOCKENTON, o.laut * (i ? 0.7 : 0.9), 0.5); });
+      ende = 0.24 + 0.55;
+    } else if (name === 'sternklang') {
+      // Die Sternschnuppe: ein kurzes Glitzern abwärts, sehr leise.
+      [2637, 2349, 2093, 1760, 1568].forEach((hz, i) => { stimmen += schlag(ctx, ziel, t0 + i * 0.055, hz, GLOCKENTON, o.laut * 0.5, 0.28); });
+      ende = 4 * 0.055 + 0.32;
+    }
+    return { stimmen, ende };
+  }
+
   /**
    * Der ganze Inhalt der Schicht als HTML.
    *
    * zustand:  aus anlassZustand()
    * optionen: { flocken, zufall, szene }
    *   szene 'gross' -- der Bildschirmschoner: unten die ganze Winterszene, alles steht da.
-   *   szene 'klein' -- das Dashboard (Vorgabe): unten nur der Schnee; Figur und Kranz tauchen
-   *                    ab und zu dahinter auf. Dort ist kein Platz für eine Szene -- unten
-   *                    steht der Streifen mit der Uhr.
+   *   szene 'klein' -- das Dashboard (Vorgabe): unten nur der Schnee; der Kranz ist dort ein
+   *                    Auftritt. Für eine Szene ist kein Platz -- unten steht der Streifen mit
+   *                    der Uhr.
    */
   function schichtHtml(zustand, optionen) {
     if (!zustand || zustand.anlass !== 'weihnachten') return '';
@@ -412,6 +678,16 @@
     const figur = zustand.figur === 'nikolaus' ? NIKOLAUS : WEIHNACHTSMANN;
     const schild = zustand.schild || schildText(new Date());
     const kranz = adventskranzSvg(zustand.advent);
+    const auftritt = (name, klasse, inhalt, attr) =>
+      `<div class="anlass-auftritt anlass-bewegt ${klasse}" data-auftritt="${name}"${attr || ''}>${inhalt}</div>`;
+    // Die Auftritte, die überall vorkommen. Jeder steht unsichtbar bereit, bis der Zeitgeber
+    // ihm die Klasse `laeuft` gibt.
+    const gaeste =
+      auftritt('schlitten', 'anlass-schlitten', `<div class="anlass-spiegel"><div class="anlass-wippe anlass-bewegt">${SCHLITTEN}</div></div>`) +
+      auftritt('schnuppe', 'anlass-schnuppe', `<i class="anlass-schweif anlass-bewegt"></i>`) +
+      auftritt('fallschirm', 'anlass-fallschirm', `<div class="anlass-pendel anlass-bewegt">${FALLSCHIRM}</div>`) +
+      auftritt('rudolf', 'anlass-rudolf', `<div class="anlass-spiegel">${RUDOLF}</div>`);
+    const figurAuftritt = auftritt('figur', 'anlass-ecke anlass-figur', figur, ` data-figur="${zustand.figur}"`);
     const szene = gross
       ? `<div class="anlass-szene">` +
           `<div class="anlass-ding anlass-baum">${TANNENBAUM}</div>` +
@@ -420,15 +696,15 @@
           `<div class="anlass-ding anlass-kranzplatz">${kranz}</div>` +
           `<div class="anlass-ding anlass-haus">${HAUS}</div>` +
           `<div class="anlass-ding anlass-schneemann">${SCHNEEMANN}</div>` +
-          `<div class="anlass-ecke anlass-figur anlass-bewegt" data-figur="${zustand.figur}">${figur}</div>` +
+          figurAuftritt +
           `<div class="anlass-wehe">${HUEGEL}</div>` +
         `</div>`
-      : `<div class="anlass-ecke anlass-figur anlass-bewegt" data-figur="${zustand.figur}">${figur}</div>` +
-        `<div class="anlass-ecke anlass-kranz anlass-bewegt">${kranz}</div>` +
+      : figurAuftritt +
+        auftritt('kranz', 'anlass-ecke anlass-kranz', kranz) +
         `<div class="anlass-wehe">${HUEGEL}</div>`;
     return '' +
       `<div class="anlass-girlande">${girlandeHtml(opt.zufall)}</div>` +
-      `<div class="anlass-schlitten anlass-bewegt"><div class="anlass-schlitten-wippe anlass-bewegt">${SCHLITTEN}</div></div>` +
+      gaeste +
       `<div class="anlass-schnee">${flocken}</div>` +
       szene;
   }
@@ -445,10 +721,6 @@
     el.innerHTML = html;
     el.classList.toggle('anlass-leer', !html);
     el.classList.toggle('anlass-gross', !!html && !!optionen && optionen.szene === 'gross');
-    if (html) {
-      el.style.setProperty('--anlass-takt-schlitten', TAKT_SCHLITTEN + 's');
-      el.style.setProperty('--anlass-takt-ecke', TAKT_ECKE + 's');
-    }
   }
 
   // Die Farben der Bühne zu Weihnachten: Rot, Gold, Tannengrün, Eisblau und Beerenrosa -- als
@@ -458,7 +730,8 @@
   const api = {
     anlassErmitteln, adventStand, figurFuer, schildText, anlassZustand, flockenDaten,
     adventskranzSvg, girlandeHtml, schichtHtml, schichtSetzen,
-    FLOCKEN_VORGABE, TAKT_SCHLITTEN, TAKT_ECKE, BOEGEN, BUEHNE_TOENE_WEIHNACHTEN
+    AUFTRITTE, auftrittWaehlen, auftrittWuerfeln, Auftritte, tonSpielen,
+    FLOCKEN_VORGABE, BOEGEN, BUEHNE_TOENE_WEIHNACHTEN
   };
   global.AnlassModul = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -276,6 +276,15 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     res.json({ ok: true, anzeigen: anzeigeHoerer.size });
   });
 
+  // Derselbe Weg fuer den Weihnachtston: Der Schlitten fliegt einmal vorbei, mit Schellen.
+  app.post('/api/anzeige/anlass-ton', (req, res) => {
+    const zeile = 'data: ' + JSON.stringify({ befehl: 'anlass-ton' }) + '\n\n';
+    for (const h of anzeigeHoerer) {
+      try { h.write(zeile); } catch (e) { anzeigeHoerer.delete(h); }
+    }
+    res.json({ ok: true, anzeigen: anzeigeHoerer.size });
+  });
+
   app.post('/api/geraet/ton-ergebnis', (req, res) => {
     const { zustand, fehler } = req.body || {};
     tonErgebnis = { zustand: String(zustand || ''), fehler: String(fehler || ''), zeit: Date.now() };
@@ -345,6 +354,8 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       desktopHintergrund: !!store.get('desktopHintergrund'),
       // Das Anlass-Design: 'auto' (ab Werk, Weihnachten vom 25.11. bis 6.1.), 'aus', 'weihnachten'.
       anlassDesign: store.get('anlassDesign') || 'auto',
+      // Die Geraeusche dazu (Schellen, Glockenspiel) -- ab Werk an, nur auf dem Dashboard.
+      anlassTon: store.get('anlassTon') !== false,
       // Der Code selbst wird nie zurueckgegeben, nur ob einer gesetzt ist.
       // Token bewusst NICHT an den Dashboard-Client zurueckgeben; HA-Aufrufe laufen ueber /api/ha/*
     });
@@ -359,7 +370,7 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       notifyTitel, notifySekunden, systemWachhalten,
       wartungsmelderUrl, wartungsmelderSchluessel,
       debugModus,
-      hintergrundBewegung, rueckkehrSekunden, desktopHintergrund, anlassDesign,
+      hintergrundBewegung, rueckkehrSekunden, desktopHintergrund, anlassDesign, anlassTon,
       schonerEnabled, schonerMinuten, schonerHelligkeit, schonerDashboard, schonerHintergrund
     } = req.body || {};
     const finalHaUrl = haUrl || store.get('haUrl');
@@ -407,6 +418,7 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       store.set('rueckkehrSekunden', Math.max(0, Math.min(3600, parseInt(rueckkehrSekunden, 10) || 0)));
     }
     if (desktopHintergrund !== undefined) store.set('desktopHintergrund', !!desktopHintergrund);
+    if (anlassTon !== undefined) store.set('anlassTon', !!anlassTon);
     if (anlassDesign !== undefined) {
       store.set('anlassDesign', ['auto', 'aus', 'weihnachten'].includes(anlassDesign) ? anlassDesign : 'auto');
     }

@@ -34,10 +34,12 @@ body.anlass-weihnachten.anlass-tag {
     linear-gradient(180deg, #4f9be0 0%, #9fd0f4 62%, #e6f4ff 100%);
   background-attachment: fixed;
 }
-body.anlass-weihnachten .lebendig span:nth-child(1) { background: radial-gradient(circle, rgba(224,46,64,0.46), transparent 68%); }
-body.anlass-weihnachten .lebendig span:nth-child(2) { background: radial-gradient(circle, rgba(34,165,101,0.42), transparent 68%); }
-body.anlass-weihnachten .lebendig span:nth-child(3) { background: radial-gradient(circle, rgba(242,193,78,0.36), transparent 68%); }
-body.anlass-weihnachten.anlass-tag .lebendig { display: none; }
+/* Die wandernden Farbflecken des Alltags (.lebendig) und die Buehne des Schoners sind zu
+   Weihnachten AUS. Beide sind grosse weichgezeichnete Flaechen, die die Grafikeinheit Bild fuer
+   Bild neu mischt -- und unter deckend bunten Karten sieht man davon nur die Fugen. Die Buehne
+   haelt dashboard.html zusaetzlich an (buehneSperren), damit auch kein Zeitgeber mehr laeuft. */
+body.anlass-weihnachten .lebendig { display: none; }
+body.anlass-weihnachten .bs-buehne { display: none; }
 /* Der Schoner ist immer Nacht: Er ist die Ruheflaeche, und die Lichter leuchten nur im Dunkeln. */
 body.anlass-weihnachten .bildschirmschoner {
   background: linear-gradient(180deg, #0a1236 0%, #171a52 58%, #3a2a6e 100%);
@@ -150,7 +152,16 @@ body.anlass-weihnachten .card:not(.type-photo):not(.type-radar):not(.type-media_
   padding: 0.2vh 1.1vh 0.3vh; border-radius: 999px;
   box-shadow: 0 0.2vh 0.4vh rgba(0,0,0,0.22);
 }
-body.anlass-weihnachten .card .ort-silhouette { opacity: 0.17; }
+/* Die Ortszeichen in ihrer Festfassung (siehe ORTE in dashboard-render.js): Auf dem Hausdach
+   liegt Schnee, und statt der Sonne steht ein Schneemann im Schneefall. Beide Fassungen stehen
+   im Markup; hier wird umgeschaltet. Die Silhouette ist zum Fest ZWEIFARBIG -- der Schnee soll
+   als Weiss auf dem Dach zu sehen sein und nicht als zweite Dachlinie --, deshalb traegt der
+   Kasten mehr Deckkraft und die Zeichnung verteilt sie selbst. Die Alltagszeichen ohne
+   Festfassung (Treppe, Sofa) bleiben so blass wie vorher. */
+body.anlass-weihnachten .ort-bild.ort-alltag.hat-fest { display: none; }
+body.anlass-weihnachten .ort-bild.ort-fest { display: block; }
+body.anlass-weihnachten .card .ort-silhouette { opacity: 0.27; }
+body.anlass-weihnachten .card .ort-silhouette .ort-bild:not(.ort-fest) { opacity: 0.45; }
 /* Ein Tor, das zu lange braucht, faerbt sich rot -- auf einer roten Karte saehe man es nicht.
    Die Warnung bekommt deshalb eine dunkle Karte, auf der Rot leuchtet. */
 body.anlass-weihnachten .card.tor-ueberfaellig { --wf1: #3a0d16; --wf2: #16060a; }
@@ -166,7 +177,6 @@ body.anlass-weihnachten .card::before {
   background:
     radial-gradient(ellipse 50% 100% at 50% 0, #fff 0 97%, transparent 100%) 0.8vh 0 / 5.4vh 1.15vh repeat-x,
     radial-gradient(ellipse 50% 100% at 50% 0, #fff 0 97%, transparent 100%) 3.1vh 0 / 8.6vh 1.75vh repeat-x;
-  filter: drop-shadow(0 0.2vh 0.2vh rgba(0,0,0,0.18));
 }
 
 /* --- Die Schicht selbst. */
@@ -177,6 +187,10 @@ body.anlass-weihnachten .card::before {
 .anlass-schicht.anlass-leer { display: none; }
 .bildschirmschoner.bs-sichtbar ~ .anlass-schicht .anlass-bewegt,
 .bildschirmschoner:not(.bs-sichtbar) > .anlass-schicht .anlass-bewegt { animation-play-state: paused; }
+/* Und die verdeckte Schicht wird gar nicht erst gezeichnet. Angehalten wuerde die Grafikeinheit
+   ihre rund achtzig Ebenen weiter mitfuehren; unsichtbar tut sie es nicht. Verzoegert um die
+   Blende des Schoners (700 ms), sonst verschwaende der Schnee, bevor der Schoner deckt. */
+.bildschirmschoner.bs-sichtbar ~ .anlass-schicht { visibility: hidden; transition: visibility 0s linear 700ms; }
 
 /* --- Die Tannengirlande. Das Gruen ist ein gestrecktes SVG in vier Lagen: dunkler Kern, zwei
    gestrichelte Lagen als Nadeln, darauf Schneetupfer. Die Strichstaerke steht in vh und mit
@@ -218,6 +232,17 @@ body.anlass-weihnachten .card::before {
 .anlass-haenger svg { width: 100%; display: block; filter: drop-shadow(0 0.3vh 0.5vh rgba(0,0,0,0.36)); }
 @keyframes anlass-pendeln { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
 
+/* --- Stehende Zeichnung, bewegte Teile. Jede Zeichnung ist ein Kasten: das SVG steht still,
+   was sich bewegt, liegt als eigenes HTML-Element in Prozent darueber (siehe anlass.js). Der
+   Schlagschatten haengt NUR am stehenden SVG -- ein Filter auf einem Element, in dem sich etwas
+   bewegt, muesste fuer jedes Bild neu gerechnet werden. */
+.anlass-bild { position: relative; display: block; width: 100%; }
+.anlass-bild > svg { display: block; width: 100%; overflow: visible;
+  filter: drop-shadow(0 0.4vh 0.8vh rgba(0,0,0,0.34)); }
+.anlass-teil { position: absolute; display: block; will-change: transform, opacity; }
+.anlass-teil > svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.anlass-fleck { border-radius: 50%; }
+
 /* --- Schnee. Ort, Groesse, Dauer und Drift kommen je Flocke aus anlass.js (einmal, beim
    Aufbau). Drei Tiefen: fern klein und langsam, nah gross und schnell. */
 .anlass-flocke {
@@ -232,67 +257,103 @@ body.anlass-weihnachten .card::before {
   100% { transform: translate3d(calc(var(--drift) * -0.4), 106vh, 0); }
 }
 
-/* --- Der Schlitten. Ein Flug dauert rund ein Achtel des Takts, den Rest wartet er rechts
-   ausserhalb des Bildes. `backwards` haelt ihn vor dem ersten Flug links draussen. */
-.anlass-schlitten {
-  position: absolute; left: 0; top: 11vh; width: 46vh; will-change: transform;
-  animation: anlass-flug var(--anlass-takt-schlitten, 150s) linear 9s infinite backwards;
-}
-.anlass-schlitten svg { width: 100%; display: block; overflow: visible;
-  filter: drop-shadow(0 0.4vh 0.8vh rgba(0,0,0,0.38)); }
-.anlass-schlitten-wippe { animation: anlass-wippen 1.7s ease-in-out infinite alternate; will-change: transform; }
+/* --- Die Auftritte: was kommt und wieder geht. Jeder steht unsichtbar bereit; der Zeitgeber in
+   anlass.js gibt ihm die Klasse `laeuft`, dazu Hoehe, Seite und Dauer als Variablen -- einmal
+   gewuerfelt. Die Animation laeuft genau EINMAL und endet ausserhalb des Bildes. Was sich im
+   Auftritt selbst bewegt (Wippen, Winken, die Nase), laeuft nur, solange er laeuft. */
+.anlass-auftritt { position: absolute; visibility: hidden; will-change: transform; }
+.anlass-auftritt.laeuft { visibility: visible; }
+.anlass-spiegel { display: block; }
+.anlass-auftritt.von-rechts .anlass-spiegel { transform: scaleX(-1); }
+
+/* Der Schlitten: quer durchs Bild, mal von links, mal von rechts, in gewuerfelter Hoehe. */
+.anlass-schlitten { left: 0; top: var(--hoehe, 14vh); width: 46vh; }
+.anlass-schlitten.laeuft { animation: anlass-flug var(--dauer, 16s) linear 1 both; }
+.anlass-schlitten.von-rechts.laeuft { animation-name: anlass-flug-zurueck; }
 @keyframes anlass-flug {
-  0%        { transform: translate3d(-50vh, 9vh, 0) rotate(-7deg); }
-  6.5%      { transform: translate3d(48vw, 0, 0) rotate(-2deg); }
-  13%, 100% { transform: translate3d(calc(100vw + 6vh), 8vh, 0) rotate(6deg); }
+  0%   { transform: translate3d(-50vh, 6vh, 0) rotate(-6deg); }
+  50%  { transform: translate3d(calc(50vw - 23vh), 0, 0) rotate(-2deg); }
+  100% { transform: translate3d(calc(100vw + 4vh), 6vh, 0) rotate(5deg); }
 }
+@keyframes anlass-flug-zurueck {
+  0%   { transform: translate3d(calc(100vw + 4vh), 6vh, 0) rotate(6deg); }
+  50%  { transform: translate3d(calc(50vw - 23vh), 0, 0) rotate(2deg); }
+  100% { transform: translate3d(-50vh, 6vh, 0) rotate(-5deg); }
+}
+.anlass-wippe { display: block; will-change: transform; }
+.anlass-schlitten.laeuft .anlass-wippe { animation: anlass-wippen 1.7s ease-in-out infinite alternate; }
 @keyframes anlass-wippen { from { transform: translate3d(0, -0.7vh, 0); } to { transform: translate3d(0, 0.7vh, 0); } }
-.anlass-nase { transform-box: fill-box; transform-origin: center;
-  animation: anlass-nase 0.9s ease-in-out infinite alternate; }
-@keyframes anlass-nase { from { transform: scale(0.8); opacity: 0.75; } to { transform: scale(1.35); opacity: 1; } }
-.anlass-funke { animation: anlass-funke 1.2s ease-in-out infinite alternate; }
-.anlass-funke.f2 { animation-delay: -0.5s; }
-.anlass-funke.f3 { animation-delay: -0.9s; }
+.anlass-auftritt.laeuft .anlass-nase { animation: anlass-nase 0.9s ease-in-out infinite alternate; }
+@keyframes anlass-nase { from { transform: scale(0.85); opacity: 0.7; } to { transform: scale(1.4); opacity: 1; } }
+.anlass-auftritt.laeuft .anlass-funke { animation: anlass-funke 1.2s ease-in-out infinite alternate; }
+.anlass-auftritt.laeuft .anlass-funke.f2 { animation-delay: -0.5s; }
+.anlass-auftritt.laeuft .anlass-funke.f3 { animation-delay: -0.9s; }
 @keyframes anlass-funke { from { opacity: 0.15; } to { opacity: 1; } }
 
-/* --- Wer hinter dem Schnee hervorschaut. Auf dem Dashboard (kleine Szene) kommen Figur und
-   Adventskranz abwechselnd, um einen halben Takt versetzt; in der grossen Szene steht der Kranz
-   fest, und nur die Figur taucht auf. */
-.anlass-ecke {
-  position: absolute; bottom: 0; will-change: transform;
-  transform: translate3d(0, 130%, 0);
-  animation: anlass-auftauchen var(--anlass-takt-ecke, 120s) ease-in-out infinite backwards;
-}
-.anlass-ecke svg { width: 100%; display: block; overflow: visible;
-  filter: drop-shadow(0 0.4vh 1vh rgba(0,0,0,0.38)); }
-.anlass-figur { right: 3.2vw; width: 19vh; animation-delay: 22s; }
-.anlass-gross .anlass-figur { width: 15.5vh; right: 2.6vw; bottom: 0.6vh; }
-.anlass-kranz { left: 3.2vw; bottom: 1.8vh; width: 22vh; animation-name: anlass-kranz;
-  animation-delay: calc(22s + var(--anlass-takt-ecke, 120s) / 2); }
+/* Wer hinter dem Schnee hervorschaut: der Weihnachtsmann (am 5./6.12. der Nikolaus), auf dem
+   Dashboard an gewuerfelter Stelle, in der grossen Szene rechts neben dem Schneemann. Auf dem
+   Dashboard taucht auch der Adventskranz so auf; in der Szene steht er fest. */
+.anlass-ecke { bottom: 0; transform: translate3d(0, 130%, 0); }
+.anlass-figur { left: var(--x, 70vw); width: 19vh; }
+.anlass-gross .anlass-figur { left: auto; right: 2.6vw; bottom: 0.6vh; width: 15.5vh; }
+.anlass-figur.laeuft { animation: anlass-auftauchen var(--dauer, 11s) ease-in-out 1 both; }
 @keyframes anlass-auftauchen {
-  0%          { transform: translate3d(0, 130%, 0) rotate(4deg); }
-  2.6%        { transform: translate3d(0, 6%, 0) rotate(-3deg); }
-  3.6%, 8.4%  { transform: translate3d(0, 11%, 0) rotate(0deg); }
-  10.6%, 100% { transform: translate3d(0, 130%, 0) rotate(4deg); }
+  0%       { transform: translate3d(0, 130%, 0) rotate(4deg); }
+  13%      { transform: translate3d(0, 6%, 0) rotate(-3deg); }
+  20%, 82% { transform: translate3d(0, 11%, 0) rotate(0deg); }
+  100%     { transform: translate3d(0, 130%, 0) rotate(4deg); }
 }
+.anlass-kranz { left: var(--x, 3vw); bottom: 1.8vh; width: 22vh; }
+.anlass-kranz.laeuft { animation: anlass-kranz var(--dauer, 13s) ease-in-out 1 both; }
 /* Der Kranz steht hoeher als die Figur: Bei ihr darf der Bart im Schnee stecken, beim Kranz
    waere genau das Gruen weg, an dem man ihn erkennt. */
 @keyframes anlass-kranz {
-  0%          { transform: translate3d(0, 130%, 0); }
-  2.8%, 11%   { transform: translate3d(0, 0, 0); }
-  13.4%, 100% { transform: translate3d(0, 130%, 0); }
+  0%       { transform: translate3d(0, 130%, 0); }
+  12%, 86% { transform: translate3d(0, 0, 0); }
+  100%     { transform: translate3d(0, 130%, 0); }
 }
-.anlass-winken { transform-box: view-box; transform-origin: 15px 104px;
-  animation: anlass-winken 0.62s ease-in-out infinite alternate; }
+.anlass-auftritt.laeuft .anlass-winken { animation: anlass-winken 0.62s ease-in-out infinite alternate; }
 @keyframes anlass-winken { from { transform: rotate(-13deg); } to { transform: rotate(15deg); } }
-.anlass-figur[data-figur="nikolaus"] .anlass-winken { transform-origin: 14px 128px;
-  animation-name: anlass-stab; animation-duration: 1.5s; }
+.anlass-figur[data-figur="nikolaus"].laeuft .anlass-winken { animation-name: anlass-stab; animation-duration: 1.5s; }
 @keyframes anlass-stab { from { transform: rotate(-4deg); } to { transform: rotate(5deg); } }
-.anlass-flamme { transform-box: fill-box; transform-origin: 50% 100%;
-  animation: anlass-flackern 0.9s ease-in-out infinite alternate; }
-.anlass-flamme.fl1 { animation-duration: 1.15s; }
-.anlass-flamme.fl2 { animation-duration: 0.75s; }
-@keyframes anlass-flackern { from { transform: scale(0.9, 0.86) skewX(-4deg); } to { transform: scale(1.06, 1.1) skewX(4deg); } }
+
+/* Rudolf schaut vom Rand herein, bleibt einen Augenblick und zieht den Kopf zurueck. */
+.anlass-rudolf { top: var(--hoehe, 40vh); right: 0; width: 20vh; transform: translate3d(105%, 0, 0); }
+.anlass-rudolf.von-rechts { right: auto; left: 0; transform: translate3d(-105%, 0, 0); }
+.anlass-rudolf.laeuft { animation: anlass-rudolf var(--dauer, 7s) ease-in-out 1 both; }
+.anlass-rudolf.von-rechts.laeuft { animation-name: anlass-rudolf-links; }
+@keyframes anlass-rudolf {
+  0%       { transform: translate3d(105%, 0, 0) rotate(6deg); }
+  16%      { transform: translate3d(16%, 0, 0) rotate(-4deg); }
+  24%, 76% { transform: translate3d(24%, 0, 0) rotate(0deg); }
+  100%     { transform: translate3d(105%, 0, 0) rotate(6deg); }
+}
+@keyframes anlass-rudolf-links {
+  0%       { transform: translate3d(-105%, 0, 0) rotate(-6deg); }
+  16%      { transform: translate3d(-16%, 0, 0) rotate(4deg); }
+  24%, 76% { transform: translate3d(-24%, 0, 0) rotate(0deg); }
+  100%     { transform: translate3d(-105%, 0, 0) rotate(-6deg); }
+}
+
+/* Die Sternschnuppe: ein heller Strich mit leuchtendem Kopf, schraeg nach unten links. */
+.anlass-schnuppe { left: var(--x, 70vw); top: var(--hoehe, 14vh); width: 26vh; height: 0.5vh;
+  transform: rotate(-24deg) translate3d(20vh, 0, 0); opacity: 0; will-change: transform, opacity; }
+.anlass-schweif { position: absolute; inset: 0; border-radius: 999px;
+  background: linear-gradient(90deg, #fff 0%, rgba(255,255,255,0.75) 16%, rgba(255,255,255,0) 100%);
+  box-shadow: 0 0 1.4vh 0.25vh rgba(255,255,255,0.5); }
+.anlass-schnuppe.laeuft { animation: anlass-schnuppe var(--dauer, 1.4s) ease-in 1 both; }
+@keyframes anlass-schnuppe {
+  0%   { transform: rotate(-24deg) translate3d(20vh, 0, 0);  opacity: 0; }
+  18%  { opacity: 1; }
+  100% { transform: rotate(-24deg) translate3d(-70vh, 0, 0); opacity: 0; }
+}
+
+/* Ein Geschenk am Fallschirm schwebt herab und versinkt im Schnee. */
+.anlass-fallschirm { left: var(--x, 50vw); top: 0; width: 11vh; transform: translate3d(0, -24vh, 0); }
+.anlass-fallschirm.laeuft { animation: anlass-schweben var(--dauer, 14s) linear 1 both; }
+@keyframes anlass-schweben { from { transform: translate3d(0, -24vh, 0); } to { transform: translate3d(0, 104vh, 0); } }
+.anlass-pendel { display: block; transform-origin: 50% 0; will-change: transform; }
+.anlass-fallschirm.laeuft .anlass-pendel { animation: anlass-pendeln 2.4s ease-in-out infinite alternate; }
 
 /* --- Der Schnee am unteren Rand: zwei Huegelketten. Er liegt VOR allem, was dahinter steht
    oder auftaucht. Auf dem Dashboard flach: Dort steht ganz unten der Streifen mit der Uhr, und
@@ -308,8 +369,6 @@ body.anlass-weihnachten .card::before {
    Dinge ueber die Breite verteilen), Groessen in vh (damit sie zur Kartenhoehe passen). */
 .anlass-szene { position: absolute; left: 0; right: 0; bottom: 0; height: 17vh; }
 .anlass-ding { position: absolute; bottom: 1.9vh; }
-.anlass-ding svg { width: 100%; display: block; overflow: visible;
-  filter: drop-shadow(0 0.4vh 0.8vh rgba(0,0,0,0.34)); }
 .anlass-baum { left: 1.4vw; width: 10.4vh; bottom: 2.6vh; }
 .anlass-geschenke { left: 9.2vw; width: 13vh; bottom: 3.2vh; }
 .anlass-kranzplatz { left: 38vw; width: 14.4vh; bottom: 3vh; }
@@ -337,35 +396,38 @@ body.anlass-weihnachten .card::before {
   background: linear-gradient(90deg, #7a4b2a, #92603a); z-index: -1;
 }
 
-/* Was sich in der Szene bewegt: die Lichter am Baum, sein Stern, der Rauch aus dem Kamin, das
-   Licht in den Fenstern, der Arm des Schneemanns. Alles klein und alles langsam. */
-.anlass-baumlicht { animation: anlass-funkeln 2.8s ease-in-out infinite; }
+/* Was sich in der Szene bewegt: die Lichter am Baum, sein Stern, der Rauch aus dem Kamin, der
+   Schein in den Fenstern, der Arm des Schneemanns, die Flammen am Kranz. Alles kleine eigene
+   Ebenen, alles langsam. Der Kranz auf dem Dashboard flackert nur, solange er zu sehen ist. */
+.anlass-baumlicht { box-shadow: 0 0 0.9vh 0.15vh currentColor; animation: anlass-funkeln 2.8s ease-in-out infinite; }
 .anlass-baumlicht.b1 { animation-delay: -0.7s; }
 .anlass-baumlicht.b2 { animation-delay: -1.4s; }
 .anlass-baumlicht.b3 { animation-delay: -2.1s; }
-.anlass-stern { transform-box: fill-box; transform-origin: center;
-  animation: anlass-stern 2.2s ease-in-out infinite alternate; }
+.anlass-stern { animation: anlass-stern 2.2s ease-in-out infinite alternate; }
 @keyframes anlass-stern { from { transform: scale(0.92) rotate(-4deg); } to { transform: scale(1.12) rotate(4deg); } }
-.anlass-rauch { transform-box: fill-box; transform-origin: center; opacity: 0;
-  animation: anlass-rauch 4.2s ease-out infinite; }
+.anlass-rauch { opacity: 0; animation: anlass-rauch 4.2s ease-out infinite; }
 .anlass-rauch.r2 { animation-delay: 1.4s; }
 .anlass-rauch.r3 { animation-delay: 2.8s; }
 @keyframes anlass-rauch {
-  0%   { opacity: 0;    transform: translate(0, 2px) scale(0.5); }
+  0%   { opacity: 0;    transform: translate3d(0, 20%, 0) scale(0.5); }
   15%  { opacity: 0.85; }
-  100% { opacity: 0;    transform: translate(7px, -22px) scale(1.7); }
+  100% { opacity: 0;    transform: translate3d(70%, -210%, 0) scale(1.7); }
 }
-.anlass-fenster { animation: anlass-fenster 3.4s ease-in-out infinite alternate; }
-@keyframes anlass-fenster { from { opacity: 0.72; } to { opacity: 1; } }
-.anlass-arm { transform-box: view-box; transform-origin: 66px 70px;
-  animation: anlass-arm 0.9s ease-in-out infinite alternate; }
+.anlass-fenster { opacity: 0.1; animation: anlass-fenster 3.4s ease-in-out infinite alternate; }
+@keyframes anlass-fenster { from { opacity: 0.1; } to { opacity: 0.9; } }
+.anlass-arm { animation: anlass-arm 0.9s ease-in-out infinite alternate; }
 @keyframes anlass-arm { from { transform: rotate(-9deg); } to { transform: rotate(12deg); } }
+.anlass-flamme { animation: anlass-flackern 0.9s ease-in-out infinite alternate; }
+.anlass-flamme.fl1 { animation-duration: 1.15s; }
+.anlass-flamme.fl2 { animation-duration: 0.75s; }
+@keyframes anlass-flackern { from { transform: scale(0.9, 0.86) skewX(-4deg); } to { transform: scale(1.06, 1.1) skewX(4deg); } }
+.anlass-kranz:not(.laeuft) .anlass-flamme { animation: none; }
 
 /* --- Ohne Bewegung bleibt, was stillsteht: bunte Karten, Schneehauben, Girlande, Szene.
-   Schnee, Schlitten und die Gaeste gibt es nur bewegt -- stehende Flocken waeren Flecken. */
-body.ohne-bewegung .anlass-schnee, body.ohne-bewegung .anlass-schlitten, body.ohne-bewegung .anlass-ecke { display: none; }
+   Schnee und Auftritte gibt es nur bewegt -- stehende Flocken waeren Flecken. */
+body.ohne-bewegung .anlass-schnee, body.ohne-bewegung .anlass-auftritt { display: none; }
 body.ohne-bewegung .anlass-bewegt { animation: none !important; }
 @media (prefers-reduced-motion: reduce) {
-  .anlass-schnee, .anlass-schlitten, .anlass-ecke { display: none; }
+  .anlass-schnee, .anlass-auftritt { display: none; }
   .anlass-bewegt { animation: none !important; }
 }

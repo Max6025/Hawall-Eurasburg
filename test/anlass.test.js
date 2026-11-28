@@ -90,10 +90,10 @@ test('Die Flocken sind in drei Tiefen verteilt, bleiben im Bild und fallen schon
 test('Der Adventskranz hat vier Kerzen, und so viele brennen, wie Advent ist', () => {
   for (let k = 0; k <= 4; k++) {
     const svg = A.adventskranzSvg(k);
-    assert.strictEqual((svg.match(/class="anlass-flamme/g) || []).length, k, `${k} Flammen`);
+    assert.strictEqual((svg.match(/anlass-flamme fl/g) || []).length, k, `${k} Flammen`);
     assert.strictEqual((svg.match(/stroke="#3a2a22"/g) || []).length, 4, 'vier Dochte');
   }
-  assert.strictEqual((A.adventskranzSvg(9).match(/class="anlass-flamme/g) || []).length, 4);
+  assert.strictEqual((A.adventskranzSvg(9).match(/anlass-flamme fl/g) || []).length, 4);
 });
 
 test('Die Schicht enthaelt alles -- und ohne Anlass nichts', () => {
@@ -129,7 +129,9 @@ test('Jede anlass-Klasse im Modul hat eine Regel im CSS, und alles Bewegte traeg
   for (const k of klassen) assert.ok(css.includes('.' + k), `keine CSS-Regel fuer .${k}`);
   // Was im CSS eine Animation bekommt, muss im HTML anlass-bewegt tragen -- sonst haelt es
   // hinter dem Schoner nicht an.
-  for (const m of css.matchAll(/\.(anlass-[a-z-]+)[^{}]*\{[^}]*animation(?:-name)?:\s*anlass-/g)) {
+  // Kommentare zuerst weg: Dort stehen Klassennamen im Fliesstext, und die sind keine Regeln.
+  const regeln = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const m of regeln.matchAll(/\.(anlass-[a-z-]+)[^{}]*\{[^}]*animation(?:-name)?:\s*anlass-/g)) {
     const k = m[1];
     if (k === 'anlass-bewegt') continue;
     const re = new RegExp(`class="[^"]*\\b${k}\\b[^"]*"`, 'g');
@@ -256,4 +258,185 @@ test('Die Weihnachtsschrift ist mitgeliefert, samt Lizenz, und das Blatt zeigt a
   assert.ok(fs.existsSync(path.join(__dirname, '..', 'renderer', 'shared', 'schriften', 'LICENSE-MountainsofChristmas.txt')));
   assert.match(lies('renderer/shared/schriften/HERKUNFT.md'), /Mountains of Christmas/);
   assert.match(css, /font-display: block/);
+});
+
+// --- Fluessig: nur die Grafikeinheit bewegt -------------------------------------------------------
+//
+// Auf dem Surface Go gemessen (1.0.41): 198 % eines Kerns und 46 % der Grafikeinheit, gemeldet
+// als Ruckeln. Die Ursache waren Bewegungen INNERHALB von SVG-Zeichnungen (Baumlichter, Winken,
+// Flammen) samt Schlagschatten darauf -- die rechnet der Hauptstrang, Bild fuer Bild. Die
+// Vorgabe: "Animationen muessen fluessig laufen, ohne Ruckeln, ohne Haengen, ohne langsam zu
+// werden. Auch wenn man den Bildschirm antippt." Diese Tests halten die Bauweise fest, die das
+// leistet: Bewegt wird nur HTML, und nur ueber transform und opacity.
+
+const ohneKommentare = (css) => css.replace(/\/\*[\s\S]*?\*\//g, '');
+const svgBloecke = (html) => html.match(/<svg[\s\S]*?<\/svg>/g) || [];
+
+test('Kein bewegtes Teil steckt in einem SVG -- in keiner Szene, an keinem Tag', () => {
+  for (const szene of ['klein', 'gross']) {
+    for (const d of [tag(2026, 11, 28), tag(2026, 12, 6), tag(2026, 12, 20)]) {
+      const html = A.schichtHtml(A.anlassZustand('auto', d), { flocken: 4, szene });
+      assert.ok(svgBloecke(html).length > 10, 'die Zeichnungen sind da');
+      for (const block of svgBloecke(html)) {
+        assert.ok(!/anlass-bewegt|anlass-teil|data-auftritt/.test(block), `bewegtes Teil im SVG (${szene}): ${block.slice(0, 90)}`);
+      }
+    }
+  }
+});
+
+test('Jede Bewegung aendert nur transform und opacity', () => {
+  const css = ohneKommentare(lies('renderer/shared/anlass.css'));
+  const bloecke = [...css.matchAll(/@keyframes (anlass-[a-z-]+) \{((?:[^{}]*\{[^{}]*\})+)\s*\}/g)];
+  assert.ok(bloecke.length >= 15, `zu wenige Bewegungen gefunden (${bloecke.length})`);
+  for (const [, name, inhalt] of bloecke) {
+    for (const m of inhalt.matchAll(/([a-z-]+)\s*:/g)) {
+      assert.ok(['transform', 'opacity'].includes(m[1]), `${name} aendert ${m[1]} -- das rechnet der Hauptstrang`);
+    }
+  }
+});
+
+test('Ein Schlagschatten haengt nur an einem stehenden SVG, nie an etwas Bewegtem', () => {
+  // Ein Filter auf einem Element, in dem sich etwas bewegt, wird fuer jedes Bild neu gerechnet.
+  const css = ohneKommentare(lies('renderer/shared/anlass.css'));
+  for (const m of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!/(^|[;\s])filter\s*:/.test(m[2])) continue;
+    for (const sel of m[1].split(',')) {
+      assert.match(sel.trim(), /svg$/, `Filter ausserhalb eines stehenden SVG: ${sel.trim()}`);
+    }
+  }
+  // Und die grossen weichgezeichneten Flaechen des Alltags sind zu Weihnachten aus.
+  assert.match(css, /body\.anlass-weihnachten \.lebendig \{ display: none; \}/);
+  assert.match(css, /body\.anlass-weihnachten \.bs-buehne \{ display: none; \}/);
+  assert.match(lies('renderer/dashboard.html'), /schoner\.buehneSperren\(z\.anlass === 'weihnachten'\)/);
+  // Die verdeckte Schicht wird gar nicht gezeichnet.
+  assert.match(css, /\.bildschirmschoner\.bs-sichtbar ~ \.anlass-schicht \{ visibility: hidden;/);
+});
+
+test('Die Buehne laesst sich sperren und startet gesperrt nicht', () => {
+  const B = require('../renderer/shared/bildschirmschoner.js');
+  const s = Object.create(B.Bildschirmschoner.prototype);
+  const rufe = [];
+  s.buehne = { starten: () => rufe.push('start'), stoppen: () => rufe.push('stopp') };
+  s.wurzel = { classList: { add() {}, remove() {} } };
+  s.sichtbar = false; s.art = 'wolken';
+  s.buehneSperren(true);
+  s.zeigen();
+  assert.deepStrictEqual(rufe, ['stopp'], 'gesperrt darf zeigen() die Buehne nicht starten');
+  s.buehneSperren(false);
+  assert.deepStrictEqual(rufe, ['stopp', 'start'], 'entsperrt laeuft sie wieder, wenn der Schoner liegt');
+});
+
+// --- Die Auftritte --------------------------------------------------------------------------------
+
+test('Auftritte kommen gewuerfelt, aber nie derselbe zweimal hintereinander', () => {
+  const namen = ['schlitten', 'figur', 'rudolf', 'schnuppe', 'fallschirm'];
+  let n = 5, zuletzt = '';
+  const zufall = () => { n = (n * 9301 + 49297) % 233280; return n / 233280; };
+  const gezaehlt = {};
+  for (let i = 0; i < 600; i++) {
+    const name = A.auftrittWaehlen(namen, zuletzt, zufall);
+    assert.ok(namen.includes(name));
+    assert.notStrictEqual(name, zuletzt, 'derselbe Auftritt zweimal wirkt wie ein Haenger');
+    gezaehlt[name] = (gezaehlt[name] || 0) + 1; zuletzt = name;
+  }
+  for (const name of namen) assert.ok(gezaehlt[name] > 30, `${name} kommt nie dran`);
+  assert.ok(gezaehlt.schlitten > gezaehlt.schnuppe, 'der Schlitten ist der haeufigste Gast');
+  // Ein einziger Auftritt darf sich wiederholen -- sonst kaeme gar keiner.
+  assert.strictEqual(A.auftrittWaehlen(['schlitten'], 'schlitten'), 'schlitten');
+  assert.strictEqual(A.auftrittWaehlen([], ''), '');
+  assert.strictEqual(A.auftrittWaehlen(['gibtsnicht'], ''), '');
+});
+
+test('Was gewuerfelt wird, bleibt im Bild und in seinem Zeitrahmen', () => {
+  let n = 11;
+  const zufall = () => { n = (n * 9301 + 49297) % 233280; return n / 233280; };
+  for (let i = 0; i < 200; i++) {
+    for (const name of Object.keys(A.AUFTRITTE)) {
+      const w = A.auftrittWuerfeln(name, i % 2 ? 'gross' : 'klein', zufall);
+      assert.ok(w.dauer >= 1 && w.dauer <= 20, `${name}: Dauer ${w.dauer}`);
+      for (const [k, v] of Object.entries(w.vars)) {
+        const zahl = parseFloat(v);
+        assert.ok(zahl >= 0 && zahl <= 95, `${name}: ${k} = ${v} liegt ausserhalb des Bildes`);
+      }
+      for (const k of w.klassen) assert.ok(['von-links', 'von-rechts'].includes(k));
+    }
+  }
+  // Mal von links, mal von rechts.
+  const seiten = new Set();
+  for (let i = 0; i < 40; i++) seiten.add(A.auftrittWuerfeln('schlitten', 'gross', zufall).klassen[0]);
+  assert.strictEqual(seiten.size, 2);
+});
+
+test('Jeder Auftritt steht in beiden Szenen bereit -- der Kranz taucht nur auf dem Dashboard auf', () => {
+  const z = A.anlassZustand('auto', tag(2026, 12, 13));
+  const namen = (szene) => [...A.schichtHtml(z, { flocken: 2, szene }).matchAll(/data-auftritt="([a-z]+)"/g)].map(m => m[1]).sort();
+  assert.deepStrictEqual(namen('klein'), ['fallschirm', 'figur', 'kranz', 'rudolf', 'schlitten', 'schnuppe']);
+  assert.deepStrictEqual(namen('gross'), ['fallschirm', 'figur', 'rudolf', 'schlitten', 'schnuppe']);
+  for (const name of namen('klein')) assert.ok(A.AUFTRITTE[name], `${name} hat keinen Eintrag`);
+  // Eine Endlosschleife im festen Takt gibt es fuer keinen Auftritt mehr.
+  const css = ohneKommentare(lies('renderer/shared/anlass.css'));
+  for (const m of css.matchAll(/\.anlass-(schlitten|figur|kranz|rudolf|schnuppe|fallschirm)[a-z.-]*\.laeuft \{ animation: [^}]*\}/g)) {
+    assert.ok(!/infinite/.test(m[0]), `${m[1]} laeuft endlos statt einmal`);
+    assert.match(m[0], / 1 both;/);
+  }
+});
+
+// --- Die Geraeusche -------------------------------------------------------------------------------
+
+// Ein Tonkontext, der nichts abspielt und alles aufschreibt.
+function tonAttrappe() {
+  const stimmen = [];
+  const param = () => ({ value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {} });
+  const knoten = () => ({ connect() {}, disconnect() {}, gain: param(), pan: param() });
+  return {
+    currentTime: 10, destination: {}, stimmen,
+    createGain: knoten, createStereoPanner: knoten,
+    createOscillator() {
+      const o = { type: '', frequency: { value: 0 }, connect() {}, start(t) { o.von = t; }, stop(t) { o.bis = t; } };
+      stimmen.push(o); return o;
+    }
+  };
+}
+
+test('Jeder Ton plant Stimmen, und keine klingt ueber sein Ende hinaus', () => {
+  for (const name of ['schellen', 'glockenspiel', 'gloeckchen', 'sternklang']) {
+    const ctx = tonAttrappe();
+    const r = A.tonSpielen(ctx, name, { dauer: 5, zufall: () => 0.5 });
+    assert.ok(r.stimmen > 0 && r.stimmen === ctx.stimmen.length, `${name}: keine Stimmen`);
+    for (const s of ctx.stimmen) {
+      assert.ok(s.von >= ctx.currentTime, `${name}: beginnt in der Vergangenheit`);
+      assert.ok(s.bis <= ctx.currentTime + r.ende + 0.1, `${name}: klingt bis ${s.bis - ctx.currentTime}, gemeldet ${r.ende}`);
+      assert.ok(s.frequency.value > 500 && s.frequency.value < 16000, `${name}: ${s.frequency.value} Hz`);
+    }
+  }
+  // Ein unbekannter Name bleibt still statt zu werfen.
+  assert.strictEqual(A.tonSpielen(tonAttrappe(), 'gibtsnicht').stimmen, 0);
+  // Die Schellen dauern so lange wie der Flug -- aber nie endlos.
+  assert.ok(A.tonSpielen(tonAttrappe(), 'schellen', { dauer: 99 }).ende <= 9.3);
+});
+
+test('Geklingelt wird nur auf dem Dashboard: nicht im Schoner, nicht in der Live-Ansicht, nicht wenn abgeschaltet', () => {
+  const seite = lies('renderer/dashboard.html');
+  const block = seite.slice(seite.indexOf('function anlassTonSpielen'), seite.indexOf('function applyTheme'));
+  assert.match(block, /if \(!IM_PANEL \|\| !ton\) return false;/);
+  assert.match(block, /config\.anlassTon === false/);
+  assert.match(block, /schoner\.istSichtbar\(\)\) return false;/);
+  // Nur die Schicht VORN bekommt den Ton -- die im Schoner hat gar keinen Rueckruf.
+  assert.match(seite, /szene: 'klein',[^}]*beiAuftritt: anlassTonSpielen/);
+  const schonerZeile = /anlassGaeste\.schoner = new AnlassModul\.Auftritte\(innen,\s*\{[^}]*\}/.exec(seite)[0];
+  assert.ok(!/beiAuftritt/.test(schonerZeile), 'der Schoner bleibt still');
+  // Und die Zeitgeber wechseln mit dem Schoner die Schicht.
+  assert.ok((seite.match(/anlassGaesteAnpassen\(\);/g) || []).length >= 4, 'nach jedem Hinlegen und Aufstehen');
+});
+
+test('Die Ton-Einstellung reist durch Server und Einstellungsseite, samt Probeknopf', () => {
+  const server = lies('server/setup-server.js');
+  assert.match(server, /anlassTon: store\.get\('anlassTon'\) !== false/);
+  assert.match(server, /store\.set\('anlassTon', !!anlassTon\)/);
+  assert.match(server, /app\.post\('\/api\/anzeige\/anlass-ton'/);
+  const js = lies('renderer/setup/theme.js'), html = lies('renderer/setup/theme.html');
+  assert.match(js, /anlassTon: \$\('anlassTon'\)\.checked/);
+  assert.match(js, /\$\('anlassTon'\)\.checked = configRes\.anlassTon !== false/);
+  assert.ok(html.includes('src="/shared/anlass.js"'), 'der Knopf "Hier anhoeren" braucht das Modul');
+  assert.match(lies('renderer/dashboard.html'), /befehl\.befehl === 'anlass-ton'/);
 });
