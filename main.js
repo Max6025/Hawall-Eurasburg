@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, screen, session, powerSaveBlocker, powerMonitor } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, screen, session, powerSaveBlocker, powerMonitor, contentTracing } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -677,6 +677,9 @@ app.whenReady().then(() => {
     // Fuer die Statusseite. Als Funktion, nicht als Wert: Die Sperren werden nach dem
     // Serverstart gesetzt, und ein Wert waere dann fuer immer der von vorher.
     sperrenBericht: () => kiosksperren.bericht(store.get('kioskSperren')),
+    // Fuer die Frage "laeuft es fluessig": zaehlt ein paar Sekunden lang, was Chromium wirklich
+    // zeichnet. Siehe bildflussMessen().
+    bildflussMessen,
     // Der Zustand des SSH-Dienstes fuer die Statusseite. Lesen genuegt und braucht keine
     // erhoehten Rechte -- starten koennte die App ihn nicht, siehe control/sshdienst.js.
     sshLesen: process.platform !== 'win32' ? null : () => sshdienst.lesen(befehlAusfuehren),
@@ -776,6 +779,45 @@ function hintergrundSetzen(art) {
 }
 
 ipcMain.handle('desktop-hintergrund-setzen', (event, art) => hintergrundSetzen(art));
+
+// --- Wie viele Bilder zeichnet die Grafikeinheit wirklich? ---------------------------------------
+//
+// "Fluessig" ist eine Zahl, und die Anzeige selbst kann sie nicht nennen: requestAnimationFrame
+// zaehlt die Bilder des HAUPTSTRANGS. Die Animationen des Weihnachtsdesigns laufen aber gerade
+// NICHT dort, sondern auf dem Compositor -- der Hauptstrang darf ruhig weniger Bilder liefern,
+// waehrend der Schnee fluessig faellt, und umgekehrt. Chromium schreibt mit, was es tut
+// (contentTracing); hier wird ein paar Sekunden lang aufgezeichnet und gezaehlt, welche
+// Ereignisse wie oft vorkamen. Die Auswertung -- welches davon "ein Bild auf dem Schirm" heisst
+// -- geschieht beim Lesen, nicht hier: Die Namen aendern sich von Version zu Version.
+//
+// Nur auf Zuruf (GET /api/debug/bildfluss). Aufzeichnen kostet selbst etwas.
+let bildflussLaeuft = false;
+async function bildflussMessen(sekunden) {
+  if (bildflussLaeuft) return { ok: false, error: 'laeuft schon' };
+  bildflussLaeuft = true;
+  const dauer = Math.max(2, Math.min(20, Number(sekunden) || 6));
+  try {
+    await contentTracing.startRecording({ included_categories: ['viz', 'benchmark', 'gpu'], excluded_categories: ['*'] });
+    await new Promise((r) => setTimeout(r, dauer * 1000));
+    const datei = await contentTracing.stopRecording();
+    const roh = JSON.parse(fs.readFileSync(datei, 'utf8'));
+    fs.unlink(datei, () => {});
+    const ereignisse = Array.isArray(roh) ? roh : (roh.traceEvents || []);
+    const zaehler = new Map();
+    for (const e of ereignisse) {
+      if (!e || !e.name || e.ph === 'M') continue;
+      const k = `${e.cat}|${e.name}|${e.ph}`;
+      zaehler.set(k, (zaehler.get(k) || 0) + 1);
+    }
+    const liste = [...zaehler.entries()].sort((a, b) => b[1] - a[1]).slice(0, 60)
+      .map(([k, n]) => ({ ereignis: k, anzahl: n, proSekunde: Math.round(n / dauer * 10) / 10 }));
+    return { ok: true, sekunden: dauer, ereignisse: ereignisse.length, liste };
+  } catch (err) {
+    return { ok: false, error: String(err && err.message || err) };
+  } finally {
+    bildflussLaeuft = false;
+  }
+}
 
 // Hebt die Systemlautstaerke an, waehrend eine Akkuwarnung laeuft. Gesenkt wird sie nie --
 // und ausserhalb einer Warnung ruft niemand das hier auf.

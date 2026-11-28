@@ -94,7 +94,7 @@ function haWebsocketCommand(haUrl, token, message, timeoutMs = 8000) {
 // haengt in einem Heimnetz, und die richtige Grenze ist das Netz, nicht dieser Express-Prozess.
 
 function startServer({ port, store, onConfigSaved, getLocalIps, updater, controller, getPanelSize,
-  sperrenBericht, gestartetAm, melder, sshLesen, geraetNeustarten }) {
+  sperrenBericht, gestartetAm, melder, sshLesen, geraetNeustarten, bildflussMessen }) {
   const app = express();
   app.use(express.json({ limit: '15mb' }));
 
@@ -313,6 +313,11 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     res.json({ ok: true });
   });
   app.get('/api/geraet/bildrate', (req, res) => res.json({ ok: true, ergebnis: bildrateErgebnis }));
+  // Die genaue Messung: was Chromium in N Sekunden wirklich gezeichnet hat (siehe main.js).
+  app.get('/api/debug/bildfluss', async (req, res) => {
+    if (typeof bildflussMessen !== 'function') return res.json({ ok: false, error: 'nur auf dem Panel' });
+    res.json(await bildflussMessen(req.query.sekunden));
+  });
 
   app.post('/api/geraet/ton-ergebnis', (req, res) => {
     const { zustand, fehler } = req.body || {};

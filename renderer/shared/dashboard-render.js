@@ -1486,15 +1486,12 @@
     return `<i class="ort-teil ${klasse}" style="left:${pz(cx - r)};top:${pz(cy - r)};width:${pz(2 * r)};height:${pz(2 * r)}${stil ? ';' + stil : ''}"></i>`;
   }
   const ortRauch = (cx, cy, r) => ['r1', 'r2', 'r3'].map(k => ortFleck('ort-rauch ' + k, cx, cy, r)).join('');
-  // Schneefall als EINE Lage: ein Bild mit Flocken, zweimal untereinander gekachelt, das um
-  // seine halbe Hoehe nach unten laeuft (siehe .ort-flocken). Einzelne Flocken waeren eine
-  // Ebene je Flocke und Karte -- bei vier Aussen-Karten zwanzig Ebenen fuer ein bisschen Schnee.
-  function ortSchneefall(flocken) {
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
-      flocken.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff"/>`).join('') + '</svg>';
-    return `<i class="ort-teil ort-flocken" style="left:0;top:-100%;width:100%;height:200%;` +
-      `background-image:url('data:image/svg+xml,${encodeURIComponent(svg)}')"></i>`;
-  }
+  // Schneefall um den Schneemann: DREI kleine Flocken, jede ein eigenes kleines Teil. In 1.0.43
+  // war es EINE grosse Lage (doppelt so hoch wie die Silhouette) -- und genau die drueckte die
+  // Bildrate auf dem Surface Go von 60 auf 38: Sie muss an den runden Ecken der Karte
+  // abgeschnitten werden, und das kostet nach FLAECHE. Kleine Teile kosten dort fast nichts
+  // (der Rauch des Hauses ist dasselbe). Am Geraet gemessen, nicht vermutet.
+  const ortSchneefall = (flocken) => flocken.map(([x, r], i) => ortFleck('ort-flocken f' + (i + 1), x, -r, r)).join('');
   // DAS SYMBOL OBEN LINKS STEHT STILL. Bis 1.0.42 bewegte es sich mit -- zwei bis drei eigene
   // Ebenen je Karte fuer eine Bewegung, die bei zwanzig Pixeln Symbolgroesse kaum jemand sieht.
   // Auf dem Surface Go zaehlt jede Ebene (der Compositor-Faden lag bei 45 % eines Kerns); die
@@ -1556,7 +1553,7 @@
       symbol: ortBild(ORT_STRICH, '<circle cx="12" cy="12" r="4.2"/>' + SONNE_STRAHLEN_SYMBOL, '', 'ort-alltag hat-fest') +
               ortBild(ORT_STRICH, SCHNEEMANN_SYMBOL + `<circle cx="3.2" cy="5" r="1"${STEHT}/><circle cx="20.6" cy="7.4" r="1"${STEHT}/>`, '', 'ort-fest'),
       silhouette: ortBild(ORT_FLAECHE, '<circle cx="12" cy="12" r="5.4"/>', ortStrahlen(ORT_FLAECHE, SONNE_STRAHLEN_FLAECHE), 'ort-alltag hat-fest') +
-                  ortBild(ORT_FLAECHE, SCHNEEMANN_FLAECHE, ortSchneefall([[2.2, 3, .8], [6.6, 14, .65], [18.4, 8, .8], [21.6, 19, .65], [12.6, 22.5, .55], [14.8, 1.2, .55]]), 'ort-fest'),
+                  ortBild(ORT_FLAECHE, SCHNEEMANN_FLAECHE, ortSchneefall([[3, .85], [20.6, .75], [12.6, .65]]), 'ort-fest'),
       animationen: [['strahlen', 60, false], ['flocken', 7, false]]
     },
     // TREPPENHAUS, der dritte Ort. Der Anlass: Im Haus haengen Fuehler im Wohnbereich UND im

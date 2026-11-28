@@ -433,7 +433,7 @@ body.light-theme .card .ort-silhouette { opacity: 1; --ort-deck: 0.09; }
 .card .ort-silhouette .ort-bild > svg { opacity: var(--ort-deck); }
 .card .ort-silhouette .ort-teil { background: color-mix(in srgb, currentColor calc(var(--ort-deck) * 100%), transparent); }
 .card .ort-silhouette .ort-teil.ort-strahlen { background: none; opacity: var(--ort-deck); }
-.card .ort-silhouette .ort-teil.ort-flocken { background-color: transparent; opacity: calc(var(--ort-deck) * 2.4); }
+.card .ort-silhouette .ort-teil.ort-flocken { background: color-mix(in srgb, currentColor calc(var(--ort-deck) * 240%), transparent); }
 /* Die eingebauten Zeichen sind Striche, die Symbole aus Home Assistant Flaechen. Ein Strich
    von zwei Einheiten wird hier auf Kartenhoehe gezogen und waere ein Balken -- deshalb duenner.
    Eine Flaeche (MDI) bleibt unberuehrt, `stroke-width` wirkt auf sie nicht. */
@@ -489,15 +489,23 @@ body.light-theme .card .ort-silhouette { opacity: 1; --ort-deck: 0.09; }
 }
 @keyframes ort-strahlen { to { transform: rotate(360deg); } }
 
-/* Aussen zum Fest: Es schneit um den Schneemann. EINE Lage (wie der grosse Schnee, siehe
-   anlass.css): ein Bild mit Flocken, zweimal untereinander gekachelt, das um seine halbe Hoehe
-   nach unten laeuft. Fuenf einzelne Flocken je Karte waeren fuenf Ebenen je Karte. */
+/* Aussen zum Fest: Es schneit um den Schneemann. Drei kleine Flocken, jede faellt durch den
+   ganzen Kasten (er ist rund fuenfzehnmal so hoch wie sie), gegeneinander versetzt. KEINE grosse
+   Lage: Die musste an den runden Ecken der Karte abgeschnitten werden und drueckte die Bildrate
+   auf dem Surface Go von 60 auf 38 -- kleine Teile kosten dort fast nichts. */
 .card .ort-flocken {
-  border-radius: 0; background-repeat: repeat-y; background-size: 100% 50%;
+  opacity: 0;
   animation: ort-flocken 7s linear infinite;
   animation-delay: var(--ph-flocken, 0s);
 }
-@keyframes ort-flocken { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, 50%, 0); } }
+.card .ort-flocken.f2 { animation-delay: calc(var(--ph-flocken, 0s) + 2.6s); }
+.card .ort-flocken.f3 { animation-delay: calc(var(--ph-flocken, 0s) + 4.9s); }
+@keyframes ort-flocken {
+  0%   { opacity: 0;    transform: translate3d(0, 0, 0); }
+  8%   { opacity: 0.95; }
+  88%  { opacity: 0.95; }
+  100% { opacity: 0;    transform: translate3d(80%, 1500%, 0); }
+}
 
 /* Treppenhaus: Der Laeufer steigt Stufe fuer Stufe, verweilt kurz auf jeder, verschwindet oben
    und faengt unten wieder an. --schritt ist eine Stufe in Prozent seiner eigenen Groesse. */
@@ -525,7 +533,7 @@ body.light-theme .card .ort-silhouette { opacity: 1; --ort-deck: 0.09; }
 
 @media (prefers-reduced-motion: reduce) {
   .card .ort-teil { animation: none; }
-  .card .ort-rauch { opacity: 0; }
+  .card .ort-rauch, .card .ort-flocken { opacity: 0; }
 }
 
 /* Leichte Schrift statt halbfett: Das ist derselbe Zug wie bei der Ueberschrift des
