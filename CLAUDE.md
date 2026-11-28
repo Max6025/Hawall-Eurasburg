@@ -70,6 +70,26 @@ sehen ist, gehört dagegen ausdrücklich **nicht** hierher — das ist Sache des
 
 ## Fallstricke
 
+- **„Wach" heißt nicht „zu sehen": Chromium zeichnet nicht, wenn es das Fenster für verdeckt
+  hält.** Gemeldet am 2026-11-28: angetippt, die Helligkeit ging hoch, aber auf der Wand blieb das
+  Bild des Bildschirmschoners stehen, nichts reagierte sichtbar — und dazu kamen die Geräusche
+  des Dashboards. Die App war wach (Zeitgeber, Eingaben und Ton laufen weiter), nur gezeichnet
+  wurde nicht mehr; im Protokoll stand zur selben Minute, dass das Fenster den Vordergrund
+  verloren hatte. Nachgestellt mit einem deckenden Fenster darüber: `requestAnimationFrame`
+  liefert kein einziges Bild, Befehle kommen weiter an. **Was** das Fenster an dem Abend
+  verdeckt hat, ist nicht geklärt — Aufwecken per Fernbefehl und per echtem Klick lief danach
+  jedes Mal sauber. Drei Dinge stehen seitdem dagegen (`test/zeichnet-immer.test.js`):
+  1. `disable-features=CalculateNativeWinOcclusion` und `backgroundThrottling: false` in
+     `main.js`. Ein Kiosk-Fenster hat kein anderes Fenster, hinter dem es zu Recht ruhen dürfte.
+  2. **Der Preis:** Dieselbe Erkennung ließ die Anzeige bei abgeschaltetem Panel ruhen. Das
+     macht die Seite jetzt selbst — `body.panel-dunkel`, gesetzt, sobald die Blende zu und
+     durchgelaufen ist, weggenommen beim ersten Öffnen.
+  3. **Die Fernprüfung fragt, ob etwas zu SEHEN ist** (`sichtbarkeit` in
+     `/api/geraet/zustand`), und ein Wechsel auf „versteckt" landet im Protokoll. Vorher meldete
+     sie „alles in Ordnung", während auf der Wand das letzte Bild stand — sie fragte nur die
+     Logik. Ein echtes Foto des Bildschirms macht `werkzeuge/bildschirmfoto.ps1`; über SSH
+     allein geht das nicht (andere Sitzung), es braucht eine geplante Aufgabe mit `/it`
+     (auf dem Panel angelegt als `hawallfoto`, schreibt `foto.png` in den Benutzerordner).
 - **Panel einschalten braucht ECHTE Eingabe.** `SC_MONITORPOWER` mit `-1` allein hält nicht, und
   `SetCursorPos` hilft nicht: Es verschiebt den Zeiger, zählt für Windows aber nicht als
   Benutzereingabe und setzt den Leerlaufzähler nicht zurück. Am Gerät sah das so aus: Panel geht
@@ -1648,7 +1668,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-704 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+711 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

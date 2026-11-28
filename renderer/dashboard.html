@@ -1626,7 +1626,11 @@ function zustandMelden(wecken) {
       stimme: (() => { try { const s = AnlassModul.stimmeWaehlen(window.speechSynthesis.getVoices()); return s ? s.name : ''; } catch (e) { return 'fehler'; } })(),
       stimmeErgebnis: anlassStimmeErgebnis,
       lichtThema: document.body.classList.contains('light-theme'),
-      bewegungen: document.getAnimations().length
+      bewegungen: document.getAnimations().length,
+      // "Wach" heisst nicht "zu sehen": Ohne diese beiden meldete die Pruefung alles in
+      // Ordnung, waehrend auf der Wand das letzte Bild stand.
+      sichtbarkeit: document.visibilityState,
+      panelDunkel: document.body.classList.contains('panel-dunkel')
     }, vorher);
     fetch(`${API}/api/geraet/zustand`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(meldung)
@@ -2271,12 +2275,47 @@ async function detailAktualisieren() {
 //      fünf Sekunden Schwarz. Also reagiert die Blende selbst, ohne auf den Takt zu warten.
 //
 // Wer zuerst merkt, gewinnt.
+//
+// Ist die Blende zu und durchgelaufen, ist das Panel aus -- dann RUHT die ganze Seite
+// (body.panel-dunkel, siehe dashboard.css). Frueher erledigte das Chromium selbst: Es hoerte auf
+// zu zeichnen, sobald der Bildschirm aus war. Diese Erkennung ist abgeschaltet (main.js,
+// CalculateNativeWinOcclusion), weil sie die Wand einmal bei eingeschaltetem Panel eingefroren
+// hat; ohne Ersatz liefen Schnee und Lichter die ganze Nacht hinter einem dunklen Bildschirm.
+// Weggenommen wird die Klasse SOFORT beim Oeffnen -- wer antippt, muss etwas sehen.
+let panelDunkelTakt = 0;
 function blendeSetzen(zu, dauerMs) {
   const el = $('panelBlende');
   if (!el) return;
   if (dauerMs) el.style.setProperty('--blende-dauer', dauerMs + 'ms');
+  const warZu = el.classList.contains('blende-zu');
   el.classList.toggle('blende-zu', !!zu);
+  if (!zu) {
+    clearTimeout(panelDunkelTakt);
+    panelDunkelTakt = 0;
+    document.body.classList.remove('panel-dunkel');
+    return;
+  }
+  if (warZu || panelDunkelTakt) return;
+  panelDunkelTakt = setTimeout(() => {
+    panelDunkelTakt = 0;
+    if (el.classList.contains('blende-zu')) document.body.classList.add('panel-dunkel');
+  }, (Number(dauerMs) || 2500) + 600);
 }
+
+// --- Zeichnet die Anzeige ueberhaupt? ----------------------------------------------------------
+//
+// Die Seite kann wach sein und trotzdem nichts zeigen: Haelt Chromium das Fenster fuer verdeckt,
+// bleibt das letzte Bild stehen, waehrend alles andere weiterlaeuft (siehe main.js). Das ist
+// abgestellt -- aber falls es je wieder vorkommt, soll es im Protokoll stehen und nicht nur
+// jemandem auffallen, der davorsteht. Gemeldet wird nur auf dem Panel und nur der WECHSEL.
+function sichtbarkeitMelden() {
+  if (!IM_PANEL) return;
+  fetch(`${API}/api/geraet/sichtbarkeit`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ zustand: document.visibilityState, schonerLiegt: !!(schoner && schoner.istSichtbar()) })
+  }).catch(() => {});
+}
+document.addEventListener('visibilitychange', sichtbarkeitMelden);
 
 function applyControlState(state) {
   if (!state) return;

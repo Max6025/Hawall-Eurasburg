@@ -333,7 +333,8 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     const b = req.body || {};
     // Nur bekannte Felder, nur einfache Werte.
     const erlaubt = ['schonerLag', 'deckte', 'geweckt', 'schonerLiegt', 'deckt', 'contentVisibility', 'karten',
-      'kartenHoehe', 'gaesteVorn', 'gaesteSchoner', 'anlass', 'lichtThema', 'bewegungen', 'stimme', 'stimmeErgebnis'];
+      'kartenHoehe', 'gaesteVorn', 'gaesteSchoner', 'anlass', 'lichtThema', 'bewegungen', 'stimme', 'stimmeErgebnis',
+      'sichtbarkeit', 'panelDunkel'];
     pruefErgebnis = {};
     for (const k of erlaubt) {
       const v = b[k];
@@ -343,6 +344,19 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     res.json({ ok: true });
   });
   app.get('/api/geraet/zustand', (req, res) => res.json({ ok: true, ergebnis: pruefErgebnis }));
+  // Die Anzeige meldet, wenn Chromium sie fuer versteckt haelt (und wenn es vorbei ist). Dann
+  // steht auf der Wand das letzte Bild, waehrend die App weiterlaeuft -- von aussen sieht man
+  // das nicht, deshalb gehoert es ins Protokoll. Nur die zwei bekannten Werte, sonst nichts.
+  app.post('/api/geraet/sichtbarkeit', (req, res) => {
+    const b = req.body || {};
+    const zustand = b.zustand === 'hidden' ? 'hidden' : (b.zustand === 'visible' ? 'visible' : '');
+    if (zustand && controller && typeof controller.log === 'function') {
+      controller.log(zustand === 'hidden' ? 'warn' : 'info', zustand === 'hidden'
+        ? `Die Anzeige haelt sich fuer verdeckt und zeichnet nicht mehr (Schoner ${b.schonerLiegt ? 'liegt' : 'liegt nicht'}).`
+        : 'Die Anzeige zeichnet wieder.');
+    }
+    res.json({ ok: !!zustand });
+  });
 
   // Die genaue Messung: was Chromium in N Sekunden wirklich gezeichnet hat (siehe main.js).
   app.get('/api/debug/bildfluss', async (req, res) => {

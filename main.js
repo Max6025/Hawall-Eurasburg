@@ -422,7 +422,9 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      // Nie drosseln, nie fuer versteckt halten -- siehe den Schalter CalculateNativeWinOcclusion.
+      backgroundThrottling: false
     }
   });
 
@@ -575,6 +577,27 @@ function pushControlState(state) {
 // An einer Wand fasst wochenlang niemand etwas an -- der Akku-Warnton waere genau dann still,
 // wenn er gebraucht wird, und zwar ohne jede Fehlermeldung.
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
+
+// Die Anzeige zeichnet IMMER, auch wenn Windows meint, das Fenster sei verdeckt.
+//
+// Chromium beobachtet unter Windows, ob ein Fenster von anderen ueberdeckt ist, und hoert dann
+// auf zu zeichnen -- das letzte Bild bleibt stehen, waehrend Zeitgeber, Eingaben und Ton
+// weiterlaufen. Am 2026-11-28 sah das auf der Wand so aus: angetippt, die Helligkeit ging hoch,
+// aber das Bild des Bildschirmschoners blieb stehen, nichts reagierte sichtbar, und dazu kamen
+// die Geraeusche des Dashboards -- die App war wach, nur zu sehen war davon nichts. Im Protokoll
+// stand zur selben Minute, dass das Fenster den Vordergrund verloren hatte. Nachgestellt mit
+// einem deckenden Fenster darueber: requestAnimationFrame liefert kein einziges Bild mehr, die
+// Befehle kommen weiter an.
+//
+// Fuer ein Fenster unter anderen ist das eine Sparmassnahme, fuer ein Wandpanel im Kiosk-Modus
+// eine Falle: Es gibt hier kein anderes Fenster, hinter dem die App zu Recht ruhen duerfte, und
+// eine Erkennung, die sich einmal irrt, friert die Wand ein. Dazu `backgroundThrottling: false`
+// am Fenster (siehe createWindow): Das haelt auch den Renderer selbst davon ab, sich fuer
+// versteckt zu halten.
+//
+// DER PREIS: Mit der Erkennung ruhte die Anzeige auch bei abgeschaltetem Panel (nachts). Das
+// uebernimmt jetzt die Seite selbst -- body.panel-dunkel in dashboard.html.
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
 
 app.whenReady().then(() => {
   createWindow();

@@ -1064,11 +1064,6 @@ body.light-theme .card .ort-silhouette { opacity: 1; --ort-deck: 0.09; }
   font-variant-numeric: tabular-nums;
 }
 .card.type-waste .waste-tag.waste-bald { color: var(--kachel-akzent, var(--text)); }
-.card.type-waste .value.waste-art {
-  font-size: clamp(1.3vh, 14cqmin, 4.6vh);
-  font-weight: 500; color: color-mix(in srgb, var(--muted) 30%, var(--text));
-  margin-top: 0.3vh;
-}
 .dt-energie .ed { width: 100%; height: 100%; }
 /* Der Zeiger nur dort, wo ein Tippen auch etwas tut. Auf der Wand ist er ohnehin aus
    (body.wandanzeige), aber in der Live-Ansicht im Browser ist er die einzige Ankuendigung,
@@ -2062,6 +2057,16 @@ body.light-theme .notify-box .as-text strong { color: #17151d; }
    behaelt den Zustand; gesetzt wird die Klasse von dashboard.html erst, wenn die Blende des
    Schoners durch ist, und weggenommen, BEVOR er aufsteht. */
 body.schoner-deckt .app { content-visibility: hidden; }
+
+/* Ist das Panel AUS (Blende zu und durchgelaufen), ruht alles darunter. Chromium hat das frueher
+   selbst getan, sobald der Bildschirm aus war; diese Erkennung ist abgeschaltet (main.js), weil
+   sie die Wand einmal bei eingeschaltetem Panel eingefroren hat. Ohne diese Regel liefen Schnee,
+   Lichter und Farbwolken die ganze Nacht hinter einem dunklen Bildschirm. Die Blende selbst
+   bleibt -- aus ihr blendet das Aufwachen auf. */
+body.panel-dunkel .app,
+body.panel-dunkel .lebendig,
+body.panel-dunkel .bildschirmschoner,
+body.panel-dunkel .anlass-schicht { visibility: hidden !important; }
 
 .bildschirmschoner {
   position: fixed; inset: 0; z-index: 9990;
