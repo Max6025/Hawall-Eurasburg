@@ -18,8 +18,23 @@ leiser) und auf Mono mit 96 kbit/s gerechnet. Zusammen rund 570 kB.
 | `neujahr.mp3` | [aufgeregt] Frohes neues Jahr! [lacht] |
 | `advent-1.mp3` … `advent-4.mp3` | [sanft] Einen schönen ersten … vierten Advent! |
 
+## Die Geräusche
+
+Zwei Soundeffekte, ebenfalls mit ElevenLabs erzeugt und am selben Tag geliefert (`glocen.mp3`
+und `recnntiergeräusch-mit-peitschenschlag.mp3`, je acht Sekunden). Beide waren sehr leise
+aufgenommen (im Mittel −33 dB).
+
+| Datei | Was | Bearbeitung |
+|---|---|---|
+| `glocken.mp3` | Schlittengeläut, gleichmäßig über acht Sekunden | +9 dB, blendet am Ende aus |
+| `rentier.mp3` | Hufgetrappel mit einem Peitschenknall bei 2,1 s | +14 dB mit Begrenzer (das Getrappel lag 20 dB unter dem Knall), blendet am Ende aus |
+| `gloeckchen.mp3` | Rudolfs Halsband | die ersten anderthalb Sekunden des Geläuts |
+
+Sie ersetzen die gerechneten Schellen und Glöckchen. Wie sie zum Schlitten zusammengesetzt
+werden — und wann die Stimme einsetzt, damit der Ruf zum Knall passt —, steht in `klangFuer()`.
+
 Welcher Spruch wann fällt, steht in `spruchWaehlen()` in `anlass.js`. Wer eine Datei tauscht,
-behält den Namen; wer eine hinzufügt, trägt sie dort in `SPRUECHE` ein — ein Test vergleicht
+behält den Namen; wer eine hinzufügt, trägt sie dort in `SPRUECHE` oder `EFFEKTE` ein — ein Test vergleicht
 Liste und Ordner in beide Richtungen.
 
 **Nicht angehört:** Die Zuordnung der Nummern zu den Namen folgt der Reihenfolge, die der Nutzer

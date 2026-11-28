@@ -526,7 +526,7 @@
   // Gegenteil: "wenn der Weihnachtsmann von unten kommt und winkt, dann kommt ho ho ho". Also
   // erst, wenn er OBEN ist. Und er SAGT es (ton 'hohoho', siehe hohoho()), statt zu klingeln.
   const AUFTRITTE = {
-    schlitten:  { gewicht: 4, ton: 'schellen',   tonNach: 0.16 },  // er ist ein Stück im Bild
+    schlitten:  { gewicht: 4, ton: 'schellen',   tonNach: 0.08 },  // er kommt gerade ins Bild
     figur:      { gewicht: 3, ton: 'hohoho',     tonNach: 0.2 },   // oben angekommen, winkt
     rudolf:     { gewicht: 2, ton: 'gloeckchen', tonNach: 0.17 },  // der Kopf ist herein
     schnuppe:   { gewicht: 2, ton: '',           tonNach: 0 },     // eine Sternschnuppe ist still
@@ -787,6 +787,49 @@
     return los[los.length - 1][0];
   }
 
+  // --- Die Geräusche aus der Aufnahme ------------------------------------------------------------
+  //
+  // Zu den Sprüchen kamen drei Geräusche (ElevenLabs Sound Effects, vom Nutzer geliefert):
+  //   glocken     Schlittengeläut, acht Sekunden, gleichmäßig
+  //   rentier     Hufgetrappel mit einem Peitschenknall bei 2,1 Sekunden
+  //   gloeckchen  die ersten anderthalb Sekunden des Geläuts -- Rudolfs Halsband
+  // Sie ersetzen die gerechneten Schellen und Glöckchen (tonSpielen), die als Notbehelf bleiben.
+  const EFFEKTE = ['glocken', 'rentier', 'gloeckchen'];
+  // Wann der Peitschenknall in `rentier` fällt -- danach richtet sich, wann die Stimme einsetzt.
+  const KNALL_NACH = 2.1;
+
+  /**
+   * Was zu einem Auftritt klingt: eine Liste von Teilen { datei, nach (Sekunden), laut (0..1) },
+   * dazu ein Name zum Merken. Leer heißt still.
+   *
+   * Der SCHLITTEN hat drei Fassungen, reihum gewürfelt:
+   *   - nur Geläut und Getrappel, der Knall mittendrin;
+   *   - dazu "Hüa, Rudolf!" -- so gelegt, dass der Ruf kurz VOR dem Knall endet;
+   *   - "Ho, ho, ho! Und los geht's!" (in dieser Aufnahme läuten schon Glocken, also ohne das
+   *     Geläut), und das Getrappel setzt so ein, dass der Knall NACH dem Satz kommt.
+   * Die FIGUR sagt ihren Spruch (spruchWaehlen), RUDOLF klingelt mit dem Halsband.
+   */
+  function klangFuer(auftritt, datum, zuletzt, zufall) {
+    const r = zufall || Math.random;
+    if (auftritt === 'schlitten') {
+      let fassungen = ['schlitten-ohne', 'schlitten-2', 'schlitten-1'];
+      if (fassungen.includes(zuletzt)) fassungen = fassungen.filter(f => f !== zuletzt);
+      const name = fassungen[Math.floor(r() * fassungen.length)];
+      if (name === 'schlitten-1') {
+        return { name, teile: [{ datei: 'schlitten-1', nach: 0, laut: 1 }, { datei: 'rentier', nach: 2.4, laut: 0.85 }] };
+      }
+      const teile = [{ datei: 'glocken', nach: 0, laut: 0.8 }, { datei: 'rentier', nach: 0, laut: 0.9 }];
+      if (name === 'schlitten-2') teile.push({ datei: 'schlitten-2', nach: Math.max(0, KNALL_NACH - 1.3), laut: 1 });
+      return { name, teile };
+    }
+    if (auftritt === 'figur') {
+      const spruch = spruchWaehlen('figur', datum, zuletzt, r);
+      return spruch ? { name: spruch, teile: [{ datei: spruch, nach: 0, laut: 1 }] } : { name: '', teile: [] };
+    }
+    if (auftritt === 'rudolf') return { name: 'gloeckchen', teile: [{ datei: 'gloeckchen', nach: 0, laut: 0.9 }] };
+    return { name: '', teile: [] };
+  }
+
   // --- Ho, ho, ho --------------------------------------------------------------------------------
   //
   // Der Weihnachtsmann SAGT etwas. Ein Ruf lässt sich nicht aus Sinustönen rechnen wie eine
@@ -915,7 +958,7 @@
     anlassErmitteln, adventStand, figurFuer, schildText, anlassZustand, flockenDaten, schneeHtml,
     adventskranzSvg, girlandeHtml, schichtHtml, schichtSetzen,
     AUFTRITTE, auftrittWaehlen, auftrittWuerfeln, Auftritte, tonSpielen, hohoho, stimmeWaehlen, RUFE,
-    SPRUECHE, SPRUECHE_MIT_GLOCKEN, spruchWaehlen, adventssonntag,
+    SPRUECHE, SPRUECHE_MIT_GLOCKEN, spruchWaehlen, adventssonntag, EFFEKTE, klangFuer,
     FLOCKEN_VORGABE, BOEGEN, BUEHNE_TOENE_WEIHNACHTEN
   };
   global.AnlassModul = api;

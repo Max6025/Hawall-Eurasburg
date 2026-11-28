@@ -552,8 +552,8 @@ test('Ho, ho, ho: tief, gemaechlich, und ohne Stimme lieber gar nicht', () => {
 test('Jeder Spruch hat seine Datei, und keine Datei liegt herum, die niemand spielt', () => {
   const ordner = path.join(__dirname, '..', 'renderer', 'shared', 'toene');
   const dateien = fs.readdirSync(ordner).filter(d => d.endsWith('.mp3')).map(d => d.replace(/\.mp3$/, '')).sort();
-  assert.deepStrictEqual(dateien, A.SPRUECHE.slice().sort());
-  for (const name of A.SPRUECHE) {
+  assert.deepStrictEqual(dateien, A.SPRUECHE.concat(A.EFFEKTE).sort());
+  for (const name of A.SPRUECHE.concat(A.EFFEKTE)) {
     const groesse = fs.statSync(path.join(ordner, name + '.mp3')).size;
     assert.ok(groesse > 8000 && groesse < 200000, `${name}.mp3 ist ${groesse} Bytes gross`);
   }
@@ -604,13 +604,56 @@ test('Der Spruch passt zum Tag: Nikolaus, Advent, Heiligabend, Neujahr -- sonst 
   }
 });
 
-test('Die Aufnahme zuerst, dann die Sprachausgabe, dann das Glockenspiel -- und zu Glocken keine Schellen', () => {
+test('Die Aufnahme zuerst, dann die Sprachausgabe, dann das Glockenspiel', () => {
   const seite = lies('renderer/dashboard.html');
   const block = seite.slice(seite.indexOf('function anlassTonSpielen'), seite.indexOf('function applyTheme'));
-  assert.match(block, /AnlassModul\.spruchWaehlen\(name, new Date\(\), anlassSpruchZuletzt\)/);
-  assert.ok(block.indexOf('anlassSpruchSpielen(spruch') < block.indexOf('AnlassModul.hohoho('), 'die Aufnahme kommt vor dem Notbehelf');
-  assert.match(block, /SPRUECHE_MIT_GLOCKEN\.includes\(spruch\)\) anlassRechenton\('schellen'/);
-  assert.match(seite, /new Audio\('shared\/toene\/' \+ name \+ '\.mp3'\)/);
+  assert.match(block, /AnlassModul\.klangFuer\(name, new Date\(\), anlassKlangZuletzt\[name\] \|\| ''\)/);
+  assert.ok(block.indexOf('anlassAufnahmeSpielen(teil.datei') > 0 && block.indexOf('AnlassModul.hohoho(') > 0);
+  assert.match(seite, /new Audio\('shared\/toene\/' \+ datei \+ '\.mp3'\)/);
+  // Legt sich der Schoner hin, hoert auch auf, was gerade noch klingt.
+  const anpassen = seite.slice(seite.indexOf('function anlassGaesteAnpassen'), seite.indexOf('function anlassGaesteAnpassen') + 700);
+  assert.match(anpassen, /if \(liegt\) anlassKlangStoppen\(\);/);
   // Die Einstellungsseite spielt dieselben Dateien.
   assert.match(lies('renderer/setup/theme.js'), /new Audio\('\/shared\/toene\/' \+ name \+ '\.mp3'\)/);
+});
+
+// --- Die Geraeusche aus der Aufnahme: Gelaeut, Getrappel mit Peitschenknall, Halsband -------------
+
+test('Der Schlitten hat drei Fassungen, und die Stimme passt zum Peitschenknall', () => {
+  let n = 9;
+  const zufall = () => { n = (n * 9301 + 49297) % 233280; return n / 233280; };
+  const gesehen = {}; let zuletzt = '';
+  for (let i = 0; i < 300; i++) {
+    const k = A.klangFuer('schlitten', tag(2026, 12, 1), zuletzt, zufall);
+    assert.notStrictEqual(k.name, zuletzt, 'dieselbe Fassung zweimal hintereinander');
+    gesehen[k.name] = k; zuletzt = k.name;
+    for (const teil of k.teile) {
+      assert.ok(A.SPRUECHE.concat(A.EFFEKTE).includes(teil.datei), `${teil.datei} hat keine Datei`);
+      assert.ok(teil.nach >= 0 && teil.nach < 6 && teil.laut > 0 && teil.laut <= 1);
+    }
+  }
+  assert.deepStrictEqual(Object.keys(gesehen).sort(), ['schlitten-1', 'schlitten-2', 'schlitten-ohne']);
+  const dateien = (k) => k.teile.map(t => t.datei).sort();
+  assert.deepStrictEqual(dateien(gesehen['schlitten-ohne']), ['glocken', 'rentier']);
+  assert.deepStrictEqual(dateien(gesehen['schlitten-2']), ['glocken', 'rentier', 'schlitten-2']);
+  // In "schlitten-1" laeuten schon Glocken: kein zweites Gelaeut dazu.
+  assert.deepStrictEqual(dateien(gesehen['schlitten-1']), ['rentier', 'schlitten-1']);
+  assert.ok(A.SPRUECHE_MIT_GLOCKEN.includes('schlitten-1'));
+  // Der Knall faellt 2,1 s nach Beginn des Getrappels. "Hüa, Rudolf!" setzt davor ein ...
+  const hua = gesehen['schlitten-2'].teile.find(t => t.datei === 'schlitten-2');
+  const trappelnHua = gesehen['schlitten-2'].teile.find(t => t.datei === 'rentier');
+  assert.ok(hua.nach < trappelnHua.nach + 2.1, 'der Ruf muss vor dem Knall beginnen');
+  // ... und nach dem langen Satz "Und los geht's!" kommt der Knall erst hinterher (gut 4 s).
+  const trappeln1 = gesehen['schlitten-1'].teile.find(t => t.datei === 'rentier');
+  assert.ok(trappeln1.nach + 2.1 > 4, 'der Knall darf nicht in den Satz fallen');
+});
+
+test('Die Figur sagt ihren Spruch, Rudolf klingelt mit dem Halsband, alles andere ist still', () => {
+  const k = A.klangFuer('figur', tag(2026, 12, 6), '', () => 0);
+  assert.strictEqual(k.teile.length, 1);
+  assert.ok(A.SPRUECHE.includes(k.teile[0].datei));
+  assert.deepStrictEqual(A.klangFuer('rudolf', tag(2026, 12, 1), '').teile.map(t => t.datei), ['gloeckchen']);
+  for (const still of ['schnuppe', 'fallschirm', 'kranz', 'gibtsnicht']) {
+    assert.deepStrictEqual(A.klangFuer(still, tag(2026, 12, 1), '').teile, []);
+  }
 });

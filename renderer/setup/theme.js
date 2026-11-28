@@ -390,6 +390,7 @@ if (wmPruefen) {
 (function () {
   const ergebnis = (text, gut) => { $('anlassTonErgebnis').textContent = text; $('anlassTonErgebnis').className = 'result ' + (gut ? 'ok' : 'err'); };
   let kontext = null;
+  let wandProbe = 'schlitten'; // der erste Druck zeigt den Weihnachtsmann
   $('anlassTonHier').addEventListener('click', () => {
     // Dieselben Aufnahmen wie auf der Wand: erst der Weihnachtsmann, dann der Schlitten.
     const spielen = (name) => new Promise((fertig) => {
@@ -398,18 +399,29 @@ if (wmPruefen) {
       a.addEventListener('error', () => fertig(false), { once: true });
       const z = a.play(); if (z && z.catch) z.catch(() => fertig(false));
     });
-    ergebnis('Erst der Weihnachtsmann, dann der Schlitten …', true);
-    spielen('hohoho-1').then((ok1) => spielen('schlitten-1').then((ok2) => {
-      ergebnis(ok1 && ok2 ? 'Das waren zwei der dreizehn Sprüche. Auf der Wand wählt er nach Auftritt und Tag.'
-        : 'Eine Aufnahme ließ sich hier nicht abspielen.', ok1 && ok2);
-    }));
+    ergebnis('Erst der Weihnachtsmann, dann der Schlitten mit Geläut und Getrappel …', true);
+    spielen('hohoho-1').then((ok1) => {
+      // Der Schlitten: Geläut und Getrappel zugleich, und "Hüa, Rudolf!" kurz vor dem Knall.
+      setTimeout(() => spielen('schlitten-2'), 800);
+      return Promise.all([spielen('glocken'), spielen('rentier')]).then((ok) => {
+        const gut = ok1 && ok.every(Boolean);
+        ergebnis(gut ? 'So klingt es auf der Wand – dort wählt er nach Auftritt und Tag.'
+          : 'Eine Aufnahme ließ sich hier nicht abspielen.', gut);
+      });
+    });
   });
   $('anlassTonWand').addEventListener('click', async () => {
     try {
-      const r = await fetch('/api/anzeige/anlass-ton', { method: 'POST' }).then(x => x.json());
+      // Abwechselnd der Weihnachtsmann und der Schlitten -- so hoert man beides.
+      wandProbe = wandProbe === 'figur' ? 'schlitten' : 'figur';
+      const r = await fetch('/api/anzeige/anlass-ton', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ auftritt: wandProbe })
+      }).then(x => x.json());
       if (!r.ok) return ergebnis('Fehler: ' + (r.error || 'unbekannt'), false);
       ergebnis(r.anzeigen > 0
-        ? 'Abgeschickt – auf der Wand taucht jetzt der Weihnachtsmann auf und sagt seinen Spruch.'
+        ? (wandProbe === 'figur'
+          ? 'Abgeschickt – auf der Wand taucht jetzt der Weihnachtsmann auf und sagt seinen Spruch. Noch einmal drücken für den Schlitten.'
+          : 'Abgeschickt – auf der Wand fliegt jetzt der Schlitten vorbei, mit Geläut und Getrappel. Noch einmal drücken für den Weihnachtsmann.')
         : 'Es hört gerade keine Anzeige zu – läuft das Wall Display?', r.anzeigen > 0);
     } catch (e) {
       ergebnis('Nicht erreichbar: ' + String(e && e.message || e), false);

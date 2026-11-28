@@ -278,7 +278,10 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
 
   // Derselbe Weg fuer den Weihnachtston: Der Schlitten fliegt einmal vorbei, mit Schellen.
   app.post('/api/anzeige/anlass-ton', (req, res) => {
-    const zeile = 'data: ' + JSON.stringify({ befehl: 'anlass-ton' }) + '\n\n';
+    // Welcher Auftritt -- nur die, die einen Klang haben; alles andere wird zur Figur.
+    const gewuenscht = String((req.body || {}).auftritt || '');
+    const auftritt = ['figur', 'schlitten', 'rudolf'].includes(gewuenscht) ? gewuenscht : 'figur';
+    const zeile = 'data: ' + JSON.stringify({ befehl: 'anlass-ton', auftritt }) + '\n\n';
     for (const h of anzeigeHoerer) {
       try { h.write(zeile); } catch (e) { anzeigeHoerer.delete(h); }
     }

@@ -1597,8 +1597,16 @@ gewünscht war, dass die Figur **selbst** etwas von sich gibt. Vier Punkte:
    still — die Schicht dort hat gar keinen Ton-Rückruf. Was zuletzt zu hören war, meldet
    `POST /api/anzeige/zustand-pruefen` (`stimmeErgebnis`, etwa „gespielt: hohoho-1").
 
+5. **Auch die Geräusche sind Aufnahmen** (`EFFEKTE`, `klangFuer()`): Schlittengeläut, ein
+   Hufgetrappel mit Peitschenknall bei 2,1 s und Rudolfs Halsband. Der Schlitten hat drei
+   Fassungen — nur Geläut und Getrappel; dazu „Hüa, Rudolf!", so gelegt, dass der Ruf kurz vor
+   dem Knall endet; oder „Und los geht's!", bei dem der Knall erst nach dem Satz kommt. Die
+   gerechneten Töne (`tonSpielen()`) sind nur noch Notbehelf, wenn eine Datei fehlt. Legt sich
+   der Schoner hin, hört auch auf, was gerade noch klingt (`anlassKlangStoppen()`).
+
 **Ich kann nichts davon hören.** Geprüft sind Format, Dauer, Pegel und dass die Wiedergabe auf
-dem Panel bis zum Ende läuft — nicht, wie es klingt.
+dem Panel bis zum Ende läuft — nicht, wie es klingt, und nicht, ob der Ruf wirklich auf den
+Knall trifft; die Zeiten stammen aus dem Pegelverlauf der Dateien.
 
 **Die Ortszeichen haben eine Festfassung**: Auf dem Hausdach liegt Schnee (und im Fenster
 brennt Licht), statt der drehenden Sonne steht ein Schneemann im Schneefall. Beide Fassungen
@@ -1625,7 +1633,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-698 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+700 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 
