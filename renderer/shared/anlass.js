@@ -534,9 +534,86 @@
     kranz:      { gewicht: 2, ton: '',           tonNach: 0 }
   };
 
+  // REIHUM STATT GEWÜRFELT. Bis 1.0.50 wurde jeder Auftritt einzeln gewürfelt (gewichtet, nur
+  // nie derselbe zweimal). Gemeldet wurde: "es kommen gefühlt immer die gleichen" -- und das
+  // stimmte: Auf dem Dashboard liegt nach einer Minute wieder der Schoner, man sieht also je
+  // Aufwecken ein, zwei Auftritte, und mit den Gewichten waren das fast immer Schlitten oder
+  // Weihnachtsmann. Zufall ohne Gedächtnis fühlt sich bei wenigen Ziehungen nicht wie
+  // Abwechslung an.
+  //
+  // Jetzt gibt es einen BEUTEL: Alle Möglichkeiten kommen hinein, gemischt, und werden eine nach
+  // der anderen gezogen. Erst wenn er leer ist, wird neu gemischt -- so, dass die erste der
+  // neuen Runde nicht die letzte der alten ist. Der Beutel lebt über das Hinlegen und Aufwecken
+  // hinweg: Wer das Panel fünfmal antippt, sieht fünf verschiedene Auftritte.
+
+  /** Mischen (Fisher-Yates), mit austauschbarem Zufall. */
+  function mischen(liste, zufall) {
+    const r = zufall || Math.random;
+    const a = liste.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(r() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  /**
+   * Eine Runde: der Vorrat gemischt, ohne zwei gleiche hintereinander und ohne mit `zuletzt` zu
+   * beginnen (soweit der Vorrat das hergibt).
+   */
+  function rundeMischen(vorrat, zuletzt, zufall) {
+    const r = zufall || Math.random;
+    const gut = (a) => a[0] !== zuletzt && a.every((x, i) => i === 0 || x !== a[i - 1]);
+    // Erst würfeln und prüfen: Bei acht Karten mit zwei Paaren passt rund jede zweite Mischung.
+    for (let versuch = 0; versuch < 40; versuch++) {
+      const a = mischen(vorrat, r);
+      if (gut(a)) return a;
+    }
+    // Wenn das nicht aufgeht (viele gleiche Karten): der Reihe nach legen, immer die häufigste
+    // der übrigen, die nicht gleich der vorigen ist.
+    const zahl = new Map();
+    for (const x of vorrat) zahl.set(x, (zahl.get(x) || 0) + 1);
+    const a = [];
+    let davor = zuletzt;
+    while (a.length < vorrat.length) {
+      const frei = [...zahl.entries()].filter(([x, n]) => n > 0 && x !== davor).sort((p, q) => q[1] - p[1]);
+      const wahl = frei.length ? frei[0][0] : [...zahl.entries()].find(([, n]) => n > 0)[0];
+      a.push(wahl); zahl.set(wahl, zahl.get(wahl) - 1); davor = wahl;
+    }
+    return a;
+  }
+
+  /**
+   * Aus einem Beutel ziehen. `beutel` ist ein Objekt, das der Aufrufer behält (es trägt den
+   * Stand); `schluessel` nennt, welcher Beutel gemeint ist; `vorrat` ist, was hineingehört.
+   * Ändert sich der Vorrat (ein anderer Tag, andere Sprüche), wird neu gefüllt.
+   */
+  function ausBeutel(beutel, schluessel, vorrat, zufall) {
+    if (!vorrat || !vorrat.length) return '';
+    const marke = vorrat.join('|');
+    let fach = beutel[schluessel];
+    if (!fach || fach.marke !== marke) fach = beutel[schluessel] = { marke, rest: [], zuletzt: fach ? fach.zuletzt : '' };
+    if (!fach.rest.length) fach.rest = rundeMischen(vorrat, fach.zuletzt, zufall);
+    fach.zuletzt = fach.rest.shift();
+    return fach.zuletzt;
+  }
+
+  // Was in den Beutel der Auftritte kommt: jeder einmal, Schlitten und Weihnachtsmann zweimal --
+  // sie sind die Hauptfiguren, sollen aber die anderen nicht verdrängen.
+  function auftrittsVorrat(namen) {
+    const vorrat = [];
+    for (const n of (namen || [])) {
+      if (!AUFTRITTE[n]) continue;
+      vorrat.push(n);
+      if (AUFTRITTE[n].gewicht >= 3) vorrat.push(n);
+    }
+    return vorrat;
+  }
+
   /**
    * Welcher Auftritt als nächster? Gewichtet gewürfelt, aber nie derselbe zweimal
-   * hintereinander -- zweimal der Schlitten wirkt wie ein Hänger, nicht wie Zufall.
+   * hintereinander. (Der Zeitgeber zieht seit 1.0.51 aus dem Beutel; diese Funktion bleibt für
+   * den Fall, dass genau EINMAL gezogen werden soll.)
    */
   function auftrittWaehlen(namen, zuletzt, zufall) {
     const r = zufall || Math.random;
@@ -583,6 +660,8 @@
     this.tonZeitgeber = 0;
     this.aktiv = false;
     this.zuletzt = '';
+    // Der Beutel der Auftritte. Er bleibt über starten() und stoppen() hinweg bestehen.
+    this.beutel = {};
   }
   Auftritte.prototype._planen = function (min, max) {
     clearTimeout(this.zeitgeber);
@@ -595,11 +674,27 @@
   Auftritte.prototype.auftreten = function (erzwungen, stumm) {
     if (!this.aktiv && !erzwungen) return '';
     const elemente = Array.from(this.schicht.querySelectorAll('[data-auftritt]'));
-    const frei = elemente.filter(e => !e.classList.contains('laeuft')).map(e => e.dataset.auftritt);
-    const name = erzwungen && typeof erzwungen === 'string' ? erzwungen : auftrittWaehlen(frei, this.zuletzt);
+    const alle = elemente.map(e => e.dataset.auftritt);
+    const name = erzwungen && typeof erzwungen === 'string' ? erzwungen : ausBeutel(this.beutel, 'auftritt', auftrittsVorrat(alle));
     const el = elemente.find(e => e.dataset.auftritt === name);
+    const w = el ? auftrittWuerfeln(name, this.opt.szene) : null;
+    // KEIN EINSPIELER, DER NICHT MEHR FERTIG WÜRDE. Auf dem Dashboard legt sich nach einer Minute
+    // der Schoner wieder hin; ein Schlitten, der zehn Sekunden vorher losfliegt, würde mitten im
+    // Flug abgeschnitten, samt Ton. `passtNoch(dauer)` fragt den Aufrufer, ob die Zeit reicht.
+    // Reicht sie nicht, kommt der Auftritt zurück in den Beutel -- er ist dann beim nächsten
+    // Aufwecken der erste.
+    if (el && !erzwungen && this.opt.passtNoch && !this.opt.passtNoch(w.dauer)) {
+      const fach = this.beutel.auftritt;
+      if (fach) { fach.rest.unshift(name); fach.zuletzt = this.zuletzt; }
+      if (this.aktiv) this._planen(6, 12);
+      return '';
+    }
+    if (el && el.classList.contains('laeuft') && !erzwungen) {
+      // Läuft dieser gerade noch, kommt er später dran.
+      if (this.aktiv) this._planen(4, 8);
+      return '';
+    }
     if (el) {
-      const w = auftrittWuerfeln(name, this.opt.szene);
       el.classList.remove('laeuft', 'von-links', 'von-rechts');
       Object.keys(w.vars).forEach(k => el.style.setProperty(k, w.vars[k]));
       el.style.setProperty('--dauer', w.dauer + 's');
@@ -756,35 +851,42 @@
   }
 
   /**
-   * Welcher Spruch zu diesem Auftritt an diesem Tag? '' heißt: keiner (dann klingt, was der
-   * Auftritt sonst hat, oder nichts). Gewichtet gewürfelt, nie derselbe zweimal hintereinander.
+   * Welche Sprüche zu diesem Auftritt an diesem Tag in Frage kommen -- als Liste, in der ein
+   * Spruch öfter stehen darf (dann kommt er öfter). Leer heißt: keiner.
+   */
+  function spruchVorrat(auftritt, datum) {
+    const d = ALS_DATUM(datum);
+    const m = d.getMonth() + 1, t = d.getDate();
+    if (auftritt === 'schlitten') return ['schlitten-1', 'schlitten-2'];
+    if (auftritt !== 'figur') return [];
+    let vorrat;
+    // An besonderen Tagen fällt der besondere Spruch jedes zweite Mal.
+    if (m === 12 && (t === 5 || t === 6)) vorrat = ['nikolaus', 'hohoho-1', 'nikolaus', 'hohoho-2'];
+    else if (m === 12 && t === 24) vorrat = ['heiligabend', 'hohoho-weihnachten', 'heiligabend', 'hohoho-1', 'hohoho-2'];
+    else if (m === 1) vorrat = ['neujahr', 'hohoho-1', 'neujahr', 'hohoho-2'];
+    else {
+      vorrat = ['hohoho-1', 'hohoho-2', 'hohoho-brav'];
+      // "Frohe Weihnachten" erst, wenn es so weit ist -- Ende November wäre es ein Versehen.
+      if (m === 12 && t >= 20) vorrat.push('hohoho-weihnachten');
+      if (m === 12 && t >= 25) vorrat.push('hohoho-weihnachten');
+      if (m === 12 && t === 31) vorrat.push('neujahr');
+    }
+    // Der Adventssonntag kommt DAZU, auch am 6. Dezember: Beides stimmt an dem Tag.
+    const advent = adventssonntag(d);
+    if (advent) vorrat.push('advent-' + advent, 'advent-' + advent);
+    return vorrat;
+  }
+
+  /**
+   * EIN Spruch, gewürfelt aus dem Vorrat, nie derselbe wie `zuletzt`. '' heißt: keiner.
+   * (Im Betrieb wird reihum aus dem Beutel gezogen, siehe klangFuer.)
    */
   function spruchWaehlen(auftritt, datum, zuletzt, zufall) {
     const r = zufall || Math.random;
-    const d = ALS_DATUM(datum);
-    const m = d.getMonth() + 1, t = d.getDate();
-    let los = []; // [Name, Gewicht]
-    if (auftritt === 'schlitten') {
-      los = [['schlitten-1', 1], ['schlitten-2', 1]];
-    } else if (auftritt === 'figur') {
-      const advent = adventssonntag(d);
-      if (m === 12 && (t === 5 || t === 6)) los = [['nikolaus', 4], ['hohoho-1', 1], ['hohoho-2', 1]];
-      else if (m === 12 && t === 24) los = [['heiligabend', 4], ['hohoho-weihnachten', 2], ['hohoho-1', 1], ['hohoho-2', 1]];
-      else if (m === 1) los = [['neujahr', 3], ['hohoho-1', 1], ['hohoho-2', 1]];
-      else {
-        los = [['hohoho-1', 3], ['hohoho-2', 3], ['hohoho-brav', 1]];
-        // "Frohe Weihnachten" erst, wenn es so weit ist -- Ende November wäre es ein Versehen.
-        if (m === 12 && t >= 20) los.push(['hohoho-weihnachten', t >= 25 ? 4 : 2]);
-        if (m === 12 && t === 31) los.push(['neujahr', 2]);
-      }
-      // Der Adventssonntag kommt DAZU, auch am 6. Dezember: Beides stimmt an dem Tag.
-      if (advent) los.push(['advent-' + advent, 4]);
-    }
-    if (los.length > 1) los = los.filter(([n]) => n !== zuletzt);
+    let los = spruchVorrat(auftritt, datum);
+    if (new Set(los).size > 1) los = los.filter(n => n !== zuletzt);
     if (!los.length) return '';
-    let wurf = r() * los.reduce((s, [, g]) => s + g, 0);
-    for (const [n, g] of los) { wurf -= g; if (wurf < 0) return n; }
-    return los[los.length - 1][0];
+    return los[Math.floor(r() * los.length)];
   }
 
   // --- Die Geräusche aus der Aufnahme ------------------------------------------------------------
@@ -802,19 +904,18 @@
    * Was zu einem Auftritt klingt: eine Liste von Teilen { datei, nach (Sekunden), laut (0..1) },
    * dazu ein Name zum Merken. Leer heißt still.
    *
-   * Der SCHLITTEN hat drei Fassungen, reihum gewürfelt:
+   * Der SCHLITTEN hat drei Fassungen:
    *   - nur Geläut und Getrappel, der Knall mittendrin;
    *   - dazu "Hüa, Rudolf!" -- so gelegt, dass der Ruf kurz VOR dem Knall endet;
    *   - "Ho, ho, ho! Und los geht's!" (in dieser Aufnahme läuten schon Glocken, also ohne das
    *     Geläut), und das Getrappel setzt so ein, dass der Knall NACH dem Satz kommt.
-   * Die FIGUR sagt ihren Spruch (spruchWaehlen), RUDOLF klingelt mit dem Halsband.
+   * Die FIGUR sagt ihren Spruch, RUDOLF klingelt mit dem Halsband. Fassungen und Sprüche
+   * kommen REIHUM aus `beutel` (ein Objekt, das der Aufrufer behält), nicht gewürfelt.
    */
-  function klangFuer(auftritt, datum, zuletzt, zufall) {
-    const r = zufall || Math.random;
+  function klangFuer(auftritt, datum, beutel, zufall) {
+    const fach = beutel && typeof beutel === 'object' ? beutel : {};
     if (auftritt === 'schlitten') {
-      let fassungen = ['schlitten-ohne', 'schlitten-2', 'schlitten-1'];
-      if (fassungen.includes(zuletzt)) fassungen = fassungen.filter(f => f !== zuletzt);
-      const name = fassungen[Math.floor(r() * fassungen.length)];
+      const name = ausBeutel(fach, 'schlitten', ['schlitten-ohne', 'schlitten-2', 'schlitten-1'], zufall);
       if (name === 'schlitten-1') {
         return { name, teile: [{ datei: 'schlitten-1', nach: 0, laut: 1 }, { datei: 'rentier', nach: 2.4, laut: 0.85 }] };
       }
@@ -823,7 +924,8 @@
       return { name, teile };
     }
     if (auftritt === 'figur') {
-      const spruch = spruchWaehlen('figur', datum, zuletzt, r);
+      // REIHUM: Jeder Spruch des Tages kommt einmal dran, bevor sich einer wiederholt.
+      const spruch = ausBeutel(fach, 'figur', spruchVorrat('figur', datum), zufall);
       return spruch ? { name: spruch, teile: [{ datei: spruch, nach: 0, laut: 1 }] } : { name: '', teile: [] };
     }
     if (auftritt === 'rudolf') return { name: 'gloeckchen', teile: [{ datei: 'gloeckchen', nach: 0, laut: 0.9 }] };
@@ -958,7 +1060,8 @@
     anlassErmitteln, adventStand, figurFuer, schildText, anlassZustand, flockenDaten, schneeHtml,
     adventskranzSvg, girlandeHtml, schichtHtml, schichtSetzen,
     AUFTRITTE, auftrittWaehlen, auftrittWuerfeln, Auftritte, tonSpielen, hohoho, stimmeWaehlen, RUFE,
-    SPRUECHE, SPRUECHE_MIT_GLOCKEN, spruchWaehlen, adventssonntag, EFFEKTE, klangFuer,
+    SPRUECHE, SPRUECHE_MIT_GLOCKEN, spruchWaehlen, spruchVorrat, adventssonntag, EFFEKTE, klangFuer,
+    mischen, rundeMischen, ausBeutel, auftrittsVorrat,
     FLOCKEN_VORGABE, BOEGEN, BUEHNE_TOENE_WEIHNACHTEN
   };
   global.AnlassModul = api;

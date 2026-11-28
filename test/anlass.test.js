@@ -607,7 +607,7 @@ test('Der Spruch passt zum Tag: Nikolaus, Advent, Heiligabend, Neujahr -- sonst 
 test('Die Aufnahme zuerst, dann die Sprachausgabe, dann das Glockenspiel', () => {
   const seite = lies('renderer/dashboard.html');
   const block = seite.slice(seite.indexOf('function anlassTonSpielen'), seite.indexOf('function applyTheme'));
-  assert.match(block, /AnlassModul\.klangFuer\(name, new Date\(\), anlassKlangZuletzt\[name\] \|\| ''\)/);
+  assert.match(block, /AnlassModul\.klangFuer\(name, new Date\(\), anlassKlangBeutel\)/);
   assert.ok(block.indexOf('anlassAufnahmeSpielen(teil.datei') > 0 && block.indexOf('AnlassModul.hohoho(') > 0);
   assert.match(seite, /new Audio\('shared\/toene\/' \+ datei \+ '\.mp3'\)/);
   // Legt sich der Schoner hin, hoert auch auf, was gerade noch klingt.
@@ -622,9 +622,9 @@ test('Die Aufnahme zuerst, dann die Sprachausgabe, dann das Glockenspiel', () =>
 test('Der Schlitten hat drei Fassungen, und die Stimme passt zum Peitschenknall', () => {
   let n = 9;
   const zufall = () => { n = (n * 9301 + 49297) % 233280; return n / 233280; };
-  const gesehen = {}; let zuletzt = '';
+  const gesehen = {}; let zuletzt = ''; const beutel = {};
   for (let i = 0; i < 300; i++) {
-    const k = A.klangFuer('schlitten', tag(2026, 12, 1), zuletzt, zufall);
+    const k = A.klangFuer('schlitten', tag(2026, 12, 1), beutel, zufall);
     assert.notStrictEqual(k.name, zuletzt, 'dieselbe Fassung zweimal hintereinander');
     gesehen[k.name] = k; zuletzt = k.name;
     for (const teil of k.teile) {
@@ -649,11 +649,96 @@ test('Der Schlitten hat drei Fassungen, und die Stimme passt zum Peitschenknall'
 });
 
 test('Die Figur sagt ihren Spruch, Rudolf klingelt mit dem Halsband, alles andere ist still', () => {
-  const k = A.klangFuer('figur', tag(2026, 12, 6), '', () => 0);
+  const k = A.klangFuer('figur', tag(2026, 12, 6), {}, () => 0);
   assert.strictEqual(k.teile.length, 1);
   assert.ok(A.SPRUECHE.includes(k.teile[0].datei));
-  assert.deepStrictEqual(A.klangFuer('rudolf', tag(2026, 12, 1), '').teile.map(t => t.datei), ['gloeckchen']);
+  assert.deepStrictEqual(A.klangFuer('rudolf', tag(2026, 12, 1), {}).teile.map(t => t.datei), ['gloeckchen']);
   for (const still of ['schnuppe', 'fallschirm', 'kranz', 'gibtsnicht']) {
-    assert.deepStrictEqual(A.klangFuer(still, tag(2026, 12, 1), '').teile, []);
+    assert.deepStrictEqual(A.klangFuer(still, tag(2026, 12, 1), {}).teile, []);
   }
+});
+
+// --- Drei Rueckmeldungen nach dem ersten Tag mit Ton ----------------------------------------------
+//
+//   1. "Lautstaerke ist zu laut."
+//   2. "Es kommen immer die gleichen, gefuehlt."
+//   3. "Ein paar Sekunden bevor er wieder in den Screensaver geht, darf kein Einspieler kommen."
+
+test('Reihum statt gewuerfelt: Jeder Auftritt kommt dran, bevor sich einer wiederholt', () => {
+  let n = 17;
+  const zufall = () => { n = (n * 9301 + 49297) % 233280; return n / 233280; };
+  const namen = ['schlitten', 'figur', 'rudolf', 'schnuppe', 'fallschirm', 'kranz'];
+  const vorrat = A.auftrittsVorrat(namen);
+  // Schlitten und Weihnachtsmann stehen zweimal im Beutel, die anderen einmal.
+  assert.strictEqual(vorrat.length, 8);
+  assert.strictEqual(vorrat.filter(v => v === 'schlitten').length, 2);
+  assert.strictEqual(vorrat.filter(v => v === 'schnuppe').length, 1);
+  const beutel = {}; const folge = [];
+  for (let i = 0; i < 80; i++) folge.push(A.ausBeutel(beutel, 'auftritt', vorrat, zufall));
+  // In JEDER Runde von acht kommt jeder der sechs vor ...
+  for (let r = 0; r < 10; r++) {
+    const runde = folge.slice(r * 8, r * 8 + 8);
+    assert.deepStrictEqual([...new Set(runde)].sort(), namen.slice().sort(), `Runde ${r}: ${runde.join(' ')}`);
+  }
+  // ... und nie derselbe zweimal hintereinander, auch nicht ueber die Naht zweier Runden.
+  for (let i = 1; i < folge.length; i++) assert.notStrictEqual(folge[i], folge[i - 1], `Stelle ${i}: ${folge[i]}`);
+});
+
+test('Die Sprueche des Tages kommen reihum -- und der Beutel fuellt sich neu, wenn der Tag wechselt', () => {
+  const beutel = {};
+  const ziehe = (d, mal) => Array.from({ length: mal }, () => A.klangFuer('figur', d, beutel).name);
+  // Ein gewoehnlicher Tag: drei Sprueche, in je drei Zuegen alle drei.
+  const alltag = ziehe(tag(2026, 11, 30), 9);
+  for (let r = 0; r < 3; r++) assert.deepStrictEqual(alltag.slice(r * 3, r * 3 + 3).sort(), ['hohoho-1', 'hohoho-2', 'hohoho-brav']);
+  for (let i = 1; i < alltag.length; i++) assert.notStrictEqual(alltag[i], alltag[i - 1]);
+  // Nikolaustag: der besondere Spruch jedes zweite Mal, der Advent ist auch dabei.
+  const nikolaus = ziehe(tag(2026, 12, 6), 12);
+  assert.ok(nikolaus.filter(s => s === 'nikolaus').length >= 3, nikolaus.join(' '));
+  assert.ok(nikolaus.includes('advent-2'));
+  assert.ok(!nikolaus.includes('hohoho-brav'), 'der Vorrat des Vortags darf nicht nachwirken');
+  // Vorrat und Dateien passen zusammen.
+  for (const d of [tag(2026, 11, 30), tag(2026, 12, 6), tag(2026, 12, 24), tag(2026, 12, 28), tag(2027, 1, 3)]) {
+    for (const s of A.spruchVorrat('figur', d)) assert.ok(A.SPRUECHE.includes(s), `${s} hat keine Datei`);
+  }
+});
+
+test('Kein Einspieler, der nicht mehr fertig wuerde, bevor sich der Schoner hinlegt', () => {
+  const B = require('../renderer/shared/bildschirmschoner.js');
+  const jetzt = new Date(2026, 11, 1, 12, 0, 0);
+  const vor = (sek) => jetzt.getTime() - sek * 1000;
+  // Eine Minute Frist, vor 20 s bedient: noch 40 s.
+  assert.strictEqual(B.schonerRest({ aktiviert: true, letzteBedienung: vor(20), minuten: 1, jetzt }), 40);
+  assert.strictEqual(B.schonerRest({ aktiviert: true, letzteBedienung: vor(70), minuten: 1, jetzt }), 0);
+  assert.strictEqual(B.schonerRest({ aktiviert: true, letzteBedienung: 0, minuten: 1, jetzt }), 0);
+  assert.strictEqual(B.schonerRest({ aktiviert: false, letzteBedienung: vor(20), minuten: 1, jetzt }), Infinity);
+  // Dieselbe Rechnung wie sollSchonen: Wo der Rest null ist, wird geschont -- und umgekehrt.
+  for (const sek of [0, 10, 59, 60, 61, 300]) {
+    const p = { aktiviert: true, letzteBedienung: vor(sek), minuten: 1, jetzt };
+    assert.strictEqual(B.schonerRest(p) === 0, B.sollSchonen(p), `nach ${sek} s`);
+  }
+  // Der Zeitgeber fragt vor jedem Auftritt, ob er noch passt, und legt ihn sonst zurueck.
+  const quelle = lies('renderer/shared/anlass.js');
+  assert.match(quelle, /this\.opt\.passtNoch && !this\.opt\.passtNoch\(w\.dauer\)/);
+  assert.match(quelle, /fach\.rest\.unshift\(name\)/, 'der uebersprungene Auftritt kommt zurueck in den Beutel');
+  const seite = lies('renderer/dashboard.html');
+  assert.match(seite, /passtNoch: \(dauer\) => schonerRestSekunden\(\) >= dauer \+ ANLASS_PUFFER_VOR_SCHONER/);
+  const puffer = Number(/const ANLASS_PUFFER_VOR_SCHONER = (\d+);/.exec(seite)[1]);
+  assert.ok(puffer >= 4, 'nach dem Auftritt sollen ein paar Sekunden Ruhe bleiben');
+  // Nur die Schicht VORN fragt -- im Schoner gibt es nichts, wovor er fertig sein muesste.
+  const schonerZeile = /anlassGaeste\.schoner = new AnlassModul\.Auftritte\(innen,\s*\{[^}]*\}/.exec(seite)[0];
+  assert.ok(!/passtNoch/.test(schonerZeile));
+});
+
+test('Die Lautstaerke ist einstellbar und ab Werk leise', () => {
+  const server = lies('server/setup-server.js');
+  assert.match(server, /anlassLautstaerke: store\.get\('anlassLautstaerke'\) === undefined \? 30 :/);
+  assert.match(server, /Math\.max\(0, Math\.min\(100, p\)\)/);
+  const seite = lies('renderer/dashboard.html');
+  assert.match(seite, /const ANLASS_LAUTSTAERKE_VORGABE = 30;/);
+  // Jede Aufnahme und jeder Notbehelf geht durch den Regler.
+  assert.match(seite, /anlassAufnahmeSpielen\(teil\.datei, teil\.laut \* leise, sonst\)/);
+  assert.ok((seite.match(/0\.22 \* leise/g) || []).length >= 3);
+  const js = lies('renderer/setup/theme.js'), html = lies('renderer/setup/theme.html');
+  assert.match(js, /anlassLautstaerke: zahl\('anlassLautstaerke', 30\)/);
+  assert.ok(html.includes('id="anlassLautstaerke"') && html.includes('type="range"'));
 });

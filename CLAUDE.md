@@ -1604,6 +1604,21 @@ gewünscht war, dass die Figur **selbst** etwas von sich gibt. Vier Punkte:
    gerechneten Töne (`tonSpielen()`) sind nur noch Notbehelf, wenn eine Datei fehlt. Legt sich
    der Schoner hin, hört auch auf, was gerade noch klingt (`anlassKlangStoppen()`).
 
+Drei Rückmeldungen nach dem ersten Abend mit Ton (1.0.51), und jede ist eine Regel geworden:
+- **„Lautstärke ist zu laut."** Die Aufnahmen liefen mit vollem Pegel. Jetzt geht alles durch
+  einen Regler (`anlassLautstaerke`, ab Werk **30 %**), auch die Notbehelfe.
+- **„Es kommen immer die gleichen, gefühlt."** Jeder Auftritt wurde einzeln gewürfelt, und auf
+  dem Dashboard sieht man je Aufwecken nur ein, zwei — mit den Gewichten fast immer Schlitten
+  oder Weihnachtsmann. **Zufall ohne Gedächtnis fühlt sich bei wenigen Ziehungen nicht wie
+  Abwechslung an.** Jetzt wird **reihum aus einem Beutel** gezogen (`ausBeutel()`): alle hinein,
+  gemischt, einer nach dem anderen; erst wenn er leer ist, neu gemischt, und nie zwei gleiche
+  hintereinander. Das gilt für Auftritte, Sprüche und die Fassungen des Schlittens, und der
+  Beutel überlebt Hinlegen und Aufwecken.
+- **„Ein paar Sekunden bevor er wieder in den Screensaver geht, darf kein Einspieler kommen."**
+  Ein Auftritt beginnt nur, wenn er samt Ton fertig wird und danach noch sechs Sekunden Ruhe
+  bleiben (`passtNoch`, `schonerRest()`); sonst kommt er zurück in den Beutel und ist beim
+  nächsten Aufwecken der erste.
+
 **Ich kann nichts davon hören.** Geprüft sind Format, Dauer, Pegel und dass die Wiedergabe auf
 dem Panel bis zum Ende läuft — nicht, wie es klingt, und nicht, ob der Ruf wirklich auf den
 Knall trifft; die Zeiten stammen aus dem Pegelverlauf der Dateien.
@@ -1633,7 +1648,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-700 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+704 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

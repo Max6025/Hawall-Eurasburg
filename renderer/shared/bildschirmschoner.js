@@ -67,6 +67,26 @@
     return jetzt - letzte >= frist;
   }
 
+  /**
+   * Wie viele Sekunden noch, bis sich der Schoner hinlegt? 0 = er liegt (oder ist faellig),
+   * Infinity = er ist abgeschaltet. Dieselbe Rechnung wie sollSchonen(), nur als Dauer -- und
+   * deshalb hier und nicht beim Aufrufer: Zwei Stellen, die die Frist verschieden rechnen,
+   * waeren sich nach der ersten Aenderung nicht mehr einig.
+   *
+   * Gebraucht vom Weihnachtsdesign: Ein Auftritt, der nicht mehr fertig wuerde, bevor sich der
+   * Schoner hinlegt, soll gar nicht erst anfangen.
+   */
+  function schonerRest(p) {
+    if (!p || !p.aktiviert) return Infinity;
+    const minuten = Number(p.minuten);
+    const frist = (minuten > 0 ? minuten : SCHONER_MINUTEN_VORGABE) * 60000;
+    const letzte = Number(p.letzteBedienung);
+    if (!Number.isFinite(letzte) || letzte <= 0) return 0;
+    const jetzt = (p.jetzt || new Date()).getTime();
+    if (letzte > jetzt) return frist / 1000;
+    return Math.max(0, (letzte + frist - jetzt) / 1000);
+  }
+
   /** Wie hell der Schoner sein soll -- begrenzt, damit die Karten lesbar bleiben. */
   function schonerHelligkeit(wert) {
     const v = Number(wert);
@@ -187,7 +207,7 @@
   };
 
   const api = {
-    sollSchonen, schonerHelligkeit, hintergrundArt, Bildschirmschoner,
+    sollSchonen, schonerRest, schonerHelligkeit, hintergrundArt, Bildschirmschoner,
     SCHONER_MINUTEN_VORGABE, SCHONER_HELLIGKEIT_VORGABE
   };
   global.BildschirmschonerModul = api;

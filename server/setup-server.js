@@ -421,6 +421,8 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       anlassDesign: store.get('anlassDesign') || 'auto',
       // Die Geraeusche dazu (Schellen, Glockenspiel) -- ab Werk an, nur auf dem Dashboard.
       anlassTon: store.get('anlassTon') !== false,
+      // Wie laut, in Prozent. Vorgabe 30 -- mit vollem Pegel war es "zu laut".
+      anlassLautstaerke: store.get('anlassLautstaerke') === undefined ? 30 : store.get('anlassLautstaerke'),
       // Der Code selbst wird nie zurueckgegeben, nur ob einer gesetzt ist.
       // Token bewusst NICHT an den Dashboard-Client zurueckgeben; HA-Aufrufe laufen ueber /api/ha/*
     });
@@ -435,7 +437,7 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       notifyTitel, notifySekunden, systemWachhalten,
       wartungsmelderUrl, wartungsmelderSchluessel,
       debugModus,
-      hintergrundBewegung, rueckkehrSekunden, desktopHintergrund, anlassDesign, anlassTon,
+      hintergrundBewegung, rueckkehrSekunden, desktopHintergrund, anlassDesign, anlassTon, anlassLautstaerke,
       schonerEnabled, schonerMinuten, schonerHelligkeit, schonerDashboard, schonerHintergrund
     } = req.body || {};
     const finalHaUrl = haUrl || store.get('haUrl');
@@ -484,6 +486,10 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
     }
     if (desktopHintergrund !== undefined) store.set('desktopHintergrund', !!desktopHintergrund);
     if (anlassTon !== undefined) store.set('anlassTon', !!anlassTon);
+    if (anlassLautstaerke !== undefined) {
+      const p = parseInt(anlassLautstaerke, 10);
+      store.set('anlassLautstaerke', Number.isFinite(p) ? Math.max(0, Math.min(100, p)) : 30);
+    }
     if (anlassDesign !== undefined) {
       store.set('anlassDesign', ['auto', 'aus', 'weihnachten'].includes(anlassDesign) ? anlassDesign : 'auto');
     }

@@ -66,6 +66,11 @@
       er von dort. Alles <strong>nur auf dem Dashboard</strong>, also solange jemand davorsteht.
       Liegt der Bildschirmschoner, bleibt die Wand still und zeigt nur die Bewegung. Ist das
       Panel stumm, wird die Systemlautstärke einmal leise angehoben (25 %), gesenkt wird nie.</p>
+    <label>Lautstärke der Geräusche: <strong id="anlassLautstaerkeWert">30 %</strong></label>
+    <input type="range" id="anlassLautstaerke" min="5" max="100" step="5" value="30" style="max-width:320px;">
+    <p class="hint-text">Gilt für Stimme, Geläut und Getrappel zusammen. „Hier anhören“ spielt mit
+      diesem Wert – aber über die Lautsprecher dieses Geräts; wie laut es auf der Wand wirkt,
+      sagt nur „Auf der Wand abspielen“ (dort gilt der gespeicherte Wert).</p>
     <div style="display:flex; gap:0.6rem; flex-wrap:wrap; margin-bottom:0.4rem;">
       <button type="button" id="anlassTonHier" style="margin:0;">Hier anhören</button>
       <button type="button" id="anlassTonWand" style="margin:0;">Auf der Wand abspielen</button>

@@ -72,6 +72,9 @@ async function load() {
   if (configRes.rueckkehrSekunden !== undefined) $('rueckkehrSekunden').value = configRes.rueckkehrSekunden;
   $('anlassDesign').value = configRes.anlassDesign || 'auto';
   $('anlassTon').checked = configRes.anlassTon !== false;
+  $('anlassLautstaerke').value = configRes.anlassLautstaerke === undefined ? 30 : configRes.anlassLautstaerke;
+  $('anlassLautstaerkeWert').textContent = $('anlassLautstaerke').value + ' %';
+  $('anlassLautstaerke').addEventListener('input', () => { $('anlassLautstaerkeWert').textContent = $('anlassLautstaerke').value + ' %'; });
 
   // Der Zugriffsschluessel kommt ausdruecklich NICHT zurueck (siehe /api/config) -- das Feld
   // bleibt leer und heisst "unveraendert". Ohne diesen Hinweis sieht es aus, als waere keiner
@@ -197,6 +200,7 @@ function alleFelder() {
     desktopHintergrund: $('desktopHintergrund').checked,
     anlassDesign: $('anlassDesign').value,
     anlassTon: $('anlassTon').checked,
+    anlassLautstaerke: zahl('anlassLautstaerke', 30),
     rueckkehrSekunden: zahl('rueckkehrSekunden', 90),
     sunEntity: $('sunEntity').value,
     notifyEntity: $('notifyEntity').value,
@@ -395,6 +399,7 @@ if (wmPruefen) {
     // Dieselben Aufnahmen wie auf der Wand: erst der Weihnachtsmann, dann der Schlitten.
     const spielen = (name) => new Promise((fertig) => {
       const a = new Audio('/shared/toene/' + name + '.mp3');
+      a.volume = Math.max(0.05, Math.min(1, (parseInt($('anlassLautstaerke').value, 10) || 30) / 100));
       a.addEventListener('ended', () => fertig(true), { once: true });
       a.addEventListener('error', () => fertig(false), { once: true });
       const z = a.play(); if (z && z.catch) z.catch(() => fertig(false));

@@ -1062,7 +1062,9 @@ function anlassAnwenden(erzwingen) {
     // der Schoner wieder. Der erste Auftritt kommt deshalb bald, sonst sieht ihn dort niemand.
     // Und NUR hier klingt etwas dazu -- der Schoner bleibt still.
     anlassGaeste.vorn = new AnlassModul.Auftritte($('anlassSchicht'),
-      { szene: 'klein', ersterMin: 5, ersterMax: 16, warteMin: 22, warteMax: 70, beiAuftritt: anlassTonSpielen });
+      { szene: 'klein', ersterMin: 5, ersterMax: 16, warteMin: 22, warteMax: 70, beiAuftritt: anlassTonSpielen,
+        // Kein Einspieler, der nicht mehr fertig wuerde, bevor sich der Schoner hinlegt.
+        passtNoch: (dauer) => schonerRestSekunden() >= dauer + ANLASS_PUFFER_VOR_SCHONER });
     anlassGaeste.schoner = new AnlassModul.Auftritte(innen,
       { szene: 'gross', ersterMin: 20, ersterMax: 70, warteMin: 50, warteMax: 190 });
   }
@@ -1087,6 +1089,21 @@ function dashboardRuhen(an) {
   dashboardRuheTakt = setTimeout(() => {
     if (schoner && schoner.istSichtbar()) document.body.classList.add('schoner-deckt');
   }, 900);
+}
+
+// Wie lange noch, bis sich der Schoner hinlegt -- dieselbe Rechnung wie in schonerPruefen().
+// Ohne Schoner (Live-Ansicht) unendlich.
+//
+// Gemeldet: "ein paar Sekunden bevor er wieder in den Screensaver geht, darf kein Einspieler
+// kommen". Ein Auftritt beginnt deshalb nur, wenn er samt Ton fertig wird UND danach noch ein
+// paar Sekunden Ruhe bleiben -- sonst endete er genau mit dem Hinlegen, und das wirkt wie
+// abgeschnitten.
+const ANLASS_PUFFER_VOR_SCHONER = 6; // Sekunden Ruhe nach dem Auftritt, bevor der Schoner kommt
+function schonerRestSekunden() {
+  if (!schoner || !config) return Infinity;
+  return BildschirmschonerModul.schonerRest({
+    aktiviert: config.schonerEnabled !== false, letzteBedienung, minuten: config.schonerMinuten, jetzt: new Date()
+  });
 }
 
 // Die Auftritte laufen nur in der Schicht, die gerade zu sehen ist: liegt der Schoner, in
@@ -1121,9 +1138,17 @@ const ANLASS_TON_SYSTEM_MINDESTENS = 25; // Prozent; angehoben wird wie beim Akk
 let anlassTonLautGesetzt = false;
 // Was zuletzt zu hoeren war -- fuer die Pruefung aus der Ferne (zustandMelden).
 let anlassStimmeErgebnis = '';
-let anlassKlangZuletzt = {};      // je Auftritt: welche Fassung zuletzt lief
+let anlassKlangBeutel = {};       // woraus Sprueche und Fassungen REIHUM gezogen werden
 let anlassKlangLaeuft = [];       // Aufnahmen, die gerade spielen
 let anlassKlangTakte = [];        // Zeitgeber fuer Teile, die verzoegert einsetzen
+
+// Wie laut: der Regler aus den Einstellungen als Faktor 0..1. Vorgabe 30 % -- die erste Fassung
+// spielte die Aufnahmen mit vollem Pegel, und die Rueckmeldung war schlicht "zu laut".
+const ANLASS_LAUTSTAERKE_VORGABE = 30;
+function anlassLautstaerke() {
+  const p = config && config.anlassLautstaerke !== undefined ? Number(config.anlassLautstaerke) : ANLASS_LAUTSTAERKE_VORGABE;
+  return Math.max(0, Math.min(100, Number.isFinite(p) ? p : ANLASS_LAUTSTAERKE_VORGABE)) / 100;
+}
 
 // Die gerechneten Toene -- nur noch Notbehelf, wenn eine Aufnahme fehlt.
 function anlassRechenton(ton, info, laut) {
@@ -1177,10 +1202,10 @@ function anlassTonSpielen(name, info, erzwingen) {
     // Was klingt, steht in klangFuer(): die Stimme des Weihnachtsmanns, das Gelaeut des
     // Schlittens, das Getrappel mit dem Peitschenknall, Rudolfs Halsband -- alles Aufnahmen.
     // Ein neuer Auftritt loest den vorigen ab, statt sich darueberzulegen.
-    const klang = AnlassModul.klangFuer(name, new Date(), anlassKlangZuletzt[name] || '');
-    if (!klang.teile.length) { anlassRechenton(ton === 'hohoho' ? 'glockenspiel' : ton, info); return true; }
+    const klang = AnlassModul.klangFuer(name, new Date(), anlassKlangBeutel);
+    const leise = anlassLautstaerke();
+    if (!klang.teile.length) { anlassRechenton(ton === 'hohoho' ? 'glockenspiel' : ton, info, 0.22 * leise); return true; }
     anlassKlangStoppen();
-    anlassKlangZuletzt[name] = klang.name;
     for (const teil of klang.teile) {
       // Die Notbehelfe, wenn eine Datei fehlt: fuer die Stimme die Sprachausgabe von Windows,
       // dann das Glockenspiel; fuer Gelaeut und Halsband die gerechneten Toene; das Getrappel
@@ -1188,13 +1213,13 @@ function anlassTonSpielen(name, info, erzwingen) {
       const sonst = () => {
         if (name === 'figur') {
           if (AnlassModul.hohoho(window.speechSynthesis, window.SpeechSynthesisUtterance,
-            { beiEnde: (ergebnis) => { anlassStimmeErgebnis = ergebnis; } })) return;
-          anlassRechenton('glockenspiel', info);
-        } else if (teil.datei === 'glocken') anlassRechenton('schellen', info);
-        else if (teil.datei === 'gloeckchen') anlassRechenton('gloeckchen', info);
+            { laut: leise, beiEnde: (ergebnis) => { anlassStimmeErgebnis = ergebnis; } })) return;
+          anlassRechenton('glockenspiel', info, 0.22 * leise);
+        } else if (teil.datei === 'glocken') anlassRechenton('schellen', info, 0.22 * leise);
+        else if (teil.datei === 'gloeckchen') anlassRechenton('gloeckchen', info, 0.22 * leise);
       };
-      if (teil.nach > 0) anlassKlangTakte.push(setTimeout(() => anlassAufnahmeSpielen(teil.datei, teil.laut, sonst), teil.nach * 1000));
-      else anlassAufnahmeSpielen(teil.datei, teil.laut, sonst);
+      if (teil.nach > 0) anlassKlangTakte.push(setTimeout(() => anlassAufnahmeSpielen(teil.datei, teil.laut * leise, sonst), teil.nach * 1000));
+      else anlassAufnahmeSpielen(teil.datei, teil.laut * leise, sonst);
     }
     return true;
   } catch (e) {
