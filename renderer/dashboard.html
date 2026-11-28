@@ -1052,6 +1052,12 @@ function anlassAnwenden(erzwingen) {
   if (anlassGaeste.schoner) anlassGaeste.schoner.stoppen();
   anlassGaeste = { vorn: null, schoner: null };
   if (z.anlass === 'weihnachten') {
+    // Die Stimmen von Windows kommen erst auf Nachfrage und dann verzoegert: Der erste Aufruf
+    // von getVoices() liefert eine leere Liste. Ohne dieses Vorladen faende der erste "Ho, ho,
+    // ho!" nach dem Start keine Stimme, und statt des Rufs kaeme das Glockenspiel -- genau der
+    // Signalton, der nicht gewuenscht ist. Am Panel gesehen: vor der ersten Nachfrage leer,
+    // danach "Microsoft Stefan".
+    try { if (window.speechSynthesis) window.speechSynthesis.getVoices(); } catch (e) { /* keine Sprachausgabe */ }
     // Vorn (das Dashboard): Wer das Panel angetippt hat, steht eine Minute davor, dann liegt
     // der Schoner wieder. Der erste Auftritt kommt deshalb bald, sonst sieht ihn dort niemand.
     // Und NUR hier klingt etwas dazu -- der Schoner bleibt still.

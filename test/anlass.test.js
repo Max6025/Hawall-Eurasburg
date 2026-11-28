@@ -539,4 +539,7 @@ test('Ho, ho, ho: tief, gemaechlich, und ohne Stimme lieber gar nicht', () => {
   const seite = lies('renderer/dashboard.html');
   assert.match(seite, /AnlassModul\.hohoho\(window\.speechSynthesis, window\.SpeechSynthesisUtterance/);
   assert.match(seite, /ton === 'hohoho' \? 'glockenspiel' : ton/, 'ohne Stimme bleibt das Glockenspiel');
+  // Die Stimmen werden beim Aufbau vorgeladen -- der erste Aufruf von getVoices() ist leer.
+  const aufbau = seite.slice(seite.indexOf('function anlassAnwenden'), seite.indexOf('function anlassGaesteAnpassen'));
+  assert.match(aufbau, /window\.speechSynthesis\.getVoices\(\)/, 'ohne Vorladen klingelt der erste Auftritt');
 });
