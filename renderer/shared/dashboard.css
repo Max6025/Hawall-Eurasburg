@@ -2235,8 +2235,12 @@ body.light-theme .anlass-schicht:not(.bildschirmschoner > *) .anlass-flocke {
 @keyframes anlass-flackern { from { transform: scale(0.9, 0.86) skewX(-4deg); } to { transform: scale(1.06, 1.1) skewX(4deg); } }
 
 /* --- Die Schneewehe am unteren Rand: zwei Huegelketten. Sie liegt VOR Figur und Kranz, die
-   dahinter auftauchen. */
-.anlass-wehe { position: absolute; left: 0; right: 0; bottom: 0; height: 3.4vh; }
+   dahinter auftauchen.
+
+   Flach gehalten: Auf dem Hauptdashboard steht ganz unten der Streifen mit der Uhr, und mit
+   3,4vh ragte die Wehe in die Ziffern -- auf der Live-Ansicht des Panels gesehen, in der Probe
+   nicht, weil dort unten eine hohe Karte liegt. */
+.anlass-wehe { position: absolute; left: 0; right: 0; bottom: 0; height: 2.1vh; }
 .anlass-wehe svg { width: 100%; height: 100%; display: block; }
 .anlass-wehe .wehe-hinten { fill: rgba(255,255,255,0.55); }
 .anlass-wehe .wehe-vorn { fill: rgba(255,255,255,0.96); }
