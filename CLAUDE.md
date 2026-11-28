@@ -49,6 +49,7 @@ auch laufen, wenn gerade kein Dashboard geladen ist.
 | `renderer/dashboard.html` | Anzeige; empfängt den Steuerungszustand per IPC, entscheidet nichts selbst. Läuft auch als **Live-Ansicht** unter `/live` im Browser |
 | `renderer/shared/bildschirmschoner.js` | Der Ruhezustand: `sollSchonen()` ist reine Entscheidung ohne DOM und ohne Netz, der Rest ist Anzeige |
 | `renderer/shared/buehne.js` | Die driftenden Farbwolken — ein Partikelsystem, ohne jede Entscheidung |
+| `renderer/shared/anlass.js` | Das Anlass-Design (Weihnachten): wann es gilt, der wievielte Advent ist, wer um die Ecke schaut — und die Schicht aus Schnee, Lichterkette und Schlitten |
 | `renderer/shared/markdown.js` | Der kleine Markdown-Satz für eingetippte Texte |
 | `renderer/shared/dashboard-render.js` | Kartenkatalog und Rendering; enthält auch das eingebaute Design `DEFAULT_THEME` |
 | `renderer/dashboard.html` (Ansichten) | Drei Dashboard-Typen: Karten, Tracker, Status — umgeschaltet in `ansichtUmschalten()` |
@@ -1443,6 +1444,47 @@ das ändert und pro Bild rechnet, kostet das Gerät die Bildrate — auf einem S
 kein theoretischer Einwand. Aus demselben Grund hält `stoppen()` die Formen an, sobald der
 Schoner nicht liegt oder ein Standbild darüber liegt.
 
+**Das Anlass-Design ist eine SCHICHT, kein drittes Farbschema** (`renderer/shared/anlass.js`,
+seit 1.0.39). Gewünscht war: *„über Weihnachten, bzw. ab jetzt, ein Weihnachtsdesign. Mit
+Schnee, mit einem Weihnachtsmann oder Nikolaus. Verspielt."* Hell und Dunkel bleiben, wie sie
+sind; darüber liegen Schnee, eine Lichterkette, eine Schneewehe am unteren Rand, und die Karten
+tragen Schneehauben. Alle zweieinhalb Minuten fliegt der Schlitten vorbei, alle zwei Minuten
+schaut unten rechts jemand um die Ecke. Sechs Punkte:
+1. **Ab Werk an**, vom 25. November bis zum 6. Januar (`anlassDesign: 'auto'`). Abschalten und
+   „immer" stehen bei den Design-Einstellungen. Eine Verbesserung, die man erst einschalten
+   muss, ist für die meisten keine.
+2. **Drei Dinge darin sind Auskunft, nicht Dekoration**, und dafür gibt es Tests: Der
+   Adventskranz zeigt, der wievielte Advent ist (so viele Kerzen brennen — der vierte Advent ist
+   der letzte Sonntag vor dem ersten Weihnachtstag, 2023 war das der 24.). Am 5. und 6. Dezember
+   kommt der **Nikolaus** mit Mitra und Stab, sonst der Weihnachtsmann; das ist bei uns nicht
+   dasselbe.
+3. **Der Zufall läuft nur beim Aufbau**, dieselbe Regel wie bei der Bühne. Jede Flocke bekommt
+   einmal Ort, Größe, Dauer und Drift als CSS-Variable; bewegt wird ausschließlich über
+   `transform` und `opacity`. Die Birnen der Lichterkette sind deshalb HTML und kein SVG — in
+   einem SVG müsste der Browser für jedes Funkeln die ganze Kette neu zeichnen.
+4. **Es schneit nie hinter einer deckenden Fläche.** Es gibt zwei Schichten, eine über dem
+   Dashboard und eine im Schoner; alles Bewegte trägt `.anlass-bewegt`, und zwei CSS-Regeln
+   halten jeweils die Schicht an, die gerade nicht zu sehen ist. Die Schicht über dem Dashboard
+   steht dafür im DOM **nach** dem Schoner (Geschwister-Regel) — ein Test hält die Reihenfolge
+   fest.
+5. **Gebaut wird nur bei geänderter Signatur** (`anlassZustand().signatur`: Anlass, Advent,
+   Figur). `anlassAnwenden()` läuft bei jedem Config-Abruf mit und tut fast immer nichts; der
+   Wechsel über Mitternacht kommt damit von selbst. Der Schoner baut sein Inneres beim Erzeugen
+   neu (`innerHTML`) — deshalb wird danach einmal erzwungen, sonst fehlt die Schicht dort.
+6. **Ohne „Hintergrund langsam bewegen" bleibt, was stillsteht**: Farben, Schneehauben,
+   Lichterkette, Schneewehe. Schnee, Schlitten und die beiden Gäste gibt es nur bewegt —
+   stehende Flocken wären Flecken.
+
+Die Schneehaube ist die Lichtkante `.card::before`, verbreitert und mit zwei Reihen ungleich
+großer Bogen: Eine Reihe allein sieht aus wie eine Borte. Der Kartenaufbau bleibt unangetastet.
+Ansehen: `.scratch/karten-design/weihnacht-probe.html` — `?hell`, `?datum=2026-12-06`,
+`?schnell` (Schlitten und Gäste alle paar Sekunden), `?steh` (alles im Bild, zum Ansehen der
+Zeichnungen), `?still`, `?aus`.
+
+Dabei gefunden: Die Design-Seite hat `hintergrundBewegung`, `desktopHintergrund` und
+`rueckkehrSekunden` gespeichert, aber **nie geladen**. Sie zeigte immer die Vorgabe, und jedes
+Speichern — auch wegen einer ganz anderen Einstellung — setzte alle drei darauf zurück.
+
 Ansehen ohne Gerät: `.scratch/karten-design/schoner-probe.html` baut den Schoner von Hand auf
 und legt ihn nach fünf Sekunden statt nach Minuten hin. `?hell` zeigt das helle Design, `?bild`
 das Standbild statt der Wolken.
@@ -1453,7 +1495,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-659 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+672 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

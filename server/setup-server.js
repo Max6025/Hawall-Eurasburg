@@ -343,6 +343,8 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       // nachzusehen, kurz genug, dass die Wand nicht tagelang auf einem Unterdashboard steht.
       rueckkehrSekunden: store.get('rueckkehrSekunden') === undefined ? 90 : store.get('rueckkehrSekunden'),
       desktopHintergrund: !!store.get('desktopHintergrund'),
+      // Das Anlass-Design: 'auto' (ab Werk, Weihnachten vom 25.11. bis 6.1.), 'aus', 'weihnachten'.
+      anlassDesign: store.get('anlassDesign') || 'auto',
       // Der Code selbst wird nie zurueckgegeben, nur ob einer gesetzt ist.
       // Token bewusst NICHT an den Dashboard-Client zurueckgeben; HA-Aufrufe laufen ueber /api/ha/*
     });
@@ -357,7 +359,7 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       notifyTitel, notifySekunden, systemWachhalten,
       wartungsmelderUrl, wartungsmelderSchluessel,
       debugModus,
-      hintergrundBewegung, rueckkehrSekunden, desktopHintergrund,
+      hintergrundBewegung, rueckkehrSekunden, desktopHintergrund, anlassDesign,
       schonerEnabled, schonerMinuten, schonerHelligkeit, schonerDashboard, schonerHintergrund
     } = req.body || {};
     const finalHaUrl = haUrl || store.get('haUrl');
@@ -405,6 +407,9 @@ function startServer({ port, store, onConfigSaved, getLocalIps, updater, control
       store.set('rueckkehrSekunden', Math.max(0, Math.min(3600, parseInt(rueckkehrSekunden, 10) || 0)));
     }
     if (desktopHintergrund !== undefined) store.set('desktopHintergrund', !!desktopHintergrund);
+    if (anlassDesign !== undefined) {
+      store.set('anlassDesign', ['auto', 'aus', 'weihnachten'].includes(anlassDesign) ? anlassDesign : 'auto');
+    }
 
     if (schonerEnabled !== undefined) store.set('schonerEnabled', !!schonerEnabled);
     if (schonerMinuten !== undefined) {

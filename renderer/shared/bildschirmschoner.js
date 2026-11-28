@@ -148,6 +148,15 @@
     return gilt;
   };
 
+  /**
+   * Die Farben der Buehne umstellen (Anlass-Design). null stellt den ganzen Farbkreis wieder
+   * her. Wirkt ab der naechsten Geburt einer Form -- nach spaetestens zwanzig Sekunden sind
+   * alle Formen umgefaerbt, ohne dass etwas springt.
+   */
+  Bildschirmschoner.prototype.farbenSetzen = function (toene) {
+    this.buehne.toene = Array.isArray(toene) && toene.length ? toene : null;
+  };
+
   Bildschirmschoner.prototype.istSichtbar = function () { return !!this.sichtbar; };
 
   Bildschirmschoner.prototype.zeigen = function () {

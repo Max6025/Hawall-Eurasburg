@@ -106,6 +106,10 @@
        Panel anfasst; ein Tipp holt das Dashboard, und nach einer Weile legt er sich wieder
        hin. Buehne und Karten baut shared/bildschirmschoner.js selbst auf. -->
   <div class="bildschirmschoner" id="bildschirmschoner"></div>
+  <!-- Das Anlass-Design (Weihnachten): Schnee, Lichterkette, Schlitten. Steht im DOM NACH dem
+       Schoner, damit eine Geschwister-Regel die Bewegung anhaelt, solange der Schoner liegt --
+       der hat seine eigene Schicht. Faengt keine Beruehrung ab. Siehe shared/anlass.js. -->
+  <div id="anlassSchicht"></div>
 
   <!-- Ankuendigung. Der weisse Rahmen als SVG ist entfallen: Er wurde per Animation
        gezeichnet und blieb mit `forwards` stehen -- beim Ausblenden verschwand nur der
@@ -129,6 +133,7 @@
 <script src="shared/akku.js"></script>
 <script src="shared/markdown.js"></script>
 <script src="shared/buehne.js"></script>
+<script src="shared/anlass.js"></script>
 <script src="shared/bildschirmschoner.js"></script>
 <script>
 const { ICONS, defaultCardType, buildCard, resolveSpan } = DashboardRender;
@@ -195,6 +200,7 @@ async function loadConfig() {
   DashboardRender.applyCustomTheme(config.customTheme || DashboardRender.DEFAULT_THEME);
   // Bewegung ab Werk an -- sie ist der sichtbare Teil. Wem es zu unruhig ist, schaltet sie ab.
   document.body.classList.toggle('ohne-bewegung', config.hintergrundBewegung === false);
+  anlassAnwenden();
   rueckkehrTaktAnpassen();
   namenLaden();
   torZeitenLaden();
@@ -1010,6 +1016,29 @@ async function refresh() {
   if (art === 'tracker') await renderTrackerView(currentDashboardId); // Position/Akku/Zonen, nicht das versteckte Karten-Raster
   else if (art === 'status') await renderStatusView();
   else await render();
+}
+
+// --- Das Anlass-Design (Weihnachten) -- siehe shared/anlass.js ------------------------------------
+//
+// Laeuft bei jedem Config-Abruf mit (alle zehn Sekunden) und tut fast immer nichts: Gebaut wird
+// nur, wenn sich die SIGNATUR aendert -- Anlass an/aus, der wievielte Advent, Nikolaus oder
+// Weihnachtsmann. Damit kommt der Wechsel ueber Mitternacht von selbst, ohne eigene Uhr, und
+// eine Aenderung in den Einstellungen steht nach zehn Sekunden auf der Wand.
+//
+// Zwei Schichten: eine ueber dem Dashboard, eine IM Schoner. Der Schoner baut sein Inneres beim
+// Erzeugen neu (innerHTML) -- deshalb wird nach seiner Erzeugung noch einmal erzwungen.
+let anlassSignatur = null;
+function anlassAnwenden(erzwingen) {
+  const z = AnlassModul.anlassZustand(config && config.anlassDesign, new Date());
+  const bs = $('bildschirmschoner');
+  let innen = bs.querySelector(':scope > .anlass-schicht');
+  if (!erzwingen && z.signatur === anlassSignatur && (innen || !z.anlass)) return;
+  anlassSignatur = z.signatur;
+  document.body.classList.toggle('anlass-weihnachten', z.anlass === 'weihnachten');
+  AnlassModul.schichtSetzen($('anlassSchicht'), z, { flocken: 36 });
+  if (!innen) { innen = document.createElement('div'); bs.appendChild(innen); }
+  AnlassModul.schichtSetzen(innen, z, { flocken: 48 });
+  if (schoner) schoner.farbenSetzen(z.anlass === 'weihnachten' ? AnlassModul.BUEHNE_TOENE_WEIHNACHTEN : null);
 }
 
 function applyTheme() {
@@ -2179,6 +2208,8 @@ function uhrenKartenAktualisieren() {
       beimWecken: schonerWecken
     });
     schonerHintergrundAnwenden();
+    // Der Schoner hat sein Inneres gerade neu gebaut -- die Anlass-Schicht darin ist weg.
+    anlassAnwenden(true);
     // Eigener, kurzer Takt: Das Hinlegen darf sich nicht um eine halbe Minute verspaeten,
     // sonst wirkt die eingestellte Frist ungenau.
     setInterval(schonerPruefen, 5000);

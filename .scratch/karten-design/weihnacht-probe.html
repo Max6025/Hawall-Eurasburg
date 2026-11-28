@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Weihnachten – Vorschau</title>
+<!--
+  Das Anlass-Design ueber echten Karten: dieselbe CSS-Datei, dasselbe Render-Modul, dasselbe
+  anlass.js wie auf der Wand. Ohne Home Assistant, ohne Electron, ohne Geraet.
+
+    ?hell               -- helles Design (tagsueber, wenn die Sonne ueber dem Horizont steht)
+    ?datum=2026-12-06   -- ein anderer Tag: Nikolaus statt Weihnachtsmann, zwei Kerzen
+    ?schnell            -- Schlitten und Gaeste kommen alle paar Sekunden statt alle zwei Minuten
+    ?steh               -- Schlitten, Figur und Kranz stehen im Bild, zum Ansehen der Zeichnung
+    ?still              -- "Hintergrund langsam bewegen" aus: nur, was stillsteht
+    ?aus                -- ohne Anlass, zum Vergleich
+
+  Bei 1280x854 ansehen, das ist die echte Panelgroesse.
+-->
+<link rel="stylesheet" href="../../renderer/shared/dashboard.css">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  .raster { display: grid; grid-template-columns: repeat(4, 1fr); grid-template-rows: repeat(6, 1fr);
+    gap: 1.2vh; height: 100%; padding: 2vh 2vw; box-sizing: border-box; }
+  .stand { position: fixed; left: 50%; transform: translateX(-50%); top: 3.4vh; z-index: 99999;
+    font: 500 1.4vh system-ui, sans-serif; color: #9aa; background: rgba(0,0,0,0.55);
+    padding: 0.5vh 1.2vh; border-radius: 0.8vh; pointer-events: none; }
+</style>
+</head>
+<body class="wandanzeige">
+  <div class="lebendig" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="raster" id="raster"></div>
+  <div class="bildschirmschoner" id="bildschirmschoner"></div>
+  <div id="anlassSchicht"></div>
+  <div class="stand" id="stand"></div>
+
+<script src="../../renderer/shared/dashboard-render.js"></script>
+<script src="../../renderer/shared/anlass.js"></script>
+<script>
+const P = new URLSearchParams(location.search);
+DashboardRender.applyCustomTheme(DashboardRender.DEFAULT_THEME);
+if (P.has('hell')) document.body.classList.add('light-theme');
+if (P.has('still')) document.body.classList.add('ohne-bewegung');
+
+const Z = (state, attributes = {}) => ({ state, attributes });
+let saat = 7;
+const zufall = () => { saat = (saat * 9301 + 49297) % 233280; return saat / 233280 - 0.5; };
+const verlauf = (basis, schwankung) => Array.from({ length: 120 }, (_, i) =>
+  ({ t: Date.now() - (120 - i) * 150000, v: basis + Math.sin(i / 16) * schwankung + zufall() * schwankung * 0.9 }));
+const karten = [
+  ['sensor.temp_innen', 'temperature', Z('21.4', { friendly_name: 'Temperatur', unit_of_measurement: '°C' }), { ort: 'innen' }, { x: 0, y: 0, cols: 2, rows: 2 }, verlauf(21, 0.4)],
+  ['sensor.temp_aussen', 'temperature', Z('-2.6', { friendly_name: 'Temperatur', unit_of_measurement: '°C' }), { ort: 'aussen' }, { x: 2, y: 0, cols: 2, rows: 2 }, verlauf(-2, 2)],
+  ['sensor.feuchte_wz', 'humidity', Z('46', { friendly_name: 'Feuchte Wohnzimmer', unit_of_measurement: '%' }), {}, { x: 0, y: 2, cols: 1, rows: 2 }, verlauf(46, 3)],
+  ['sensor.druck', 'pressure', Z('1013', { friendly_name: 'Luftdruck', unit_of_measurement: 'hPa' }), { ort: 'treppenhaus' }, { x: 1, y: 2, cols: 1, rows: 2 }, verlauf(1013, 1)],
+  ['sensor.wind', 'wind', Z('14.6', { friendly_name: 'Wind', unit_of_measurement: 'km/h' }), { ort: 'aussen' }, { x: 2, y: 2, cols: 1, rows: 2 }, verlauf(14, 4)],
+  ['sensor.uv', 'gauge', Z('3', { friendly_name: 'UV-Index', unit_of_measurement: '' }), { ort: 'aussen', min: 0, max: 11 }, { x: 3, y: 2, cols: 1, rows: 2 }, verlauf(3, 1)],
+  ['sensor.regen', 'rain', Z('0.4', { friendly_name: 'Regen', unit_of_measurement: 'mm/h' }), { ort: 'aussen' }, { x: 0, y: 4, cols: 2, rows: 2 }, verlauf(0.4, 0.2)],
+  ['clock:1', 'clock', null, {}, { x: 2, y: 4, cols: 2, rows: 2 }, null]
+];
+const raster = document.getElementById('raster');
+karten.forEach(([id, typ, zustand, settings, pos, history]) => {
+  raster.appendChild(DashboardRender.buildCard(id, zustand, typ, pos, {
+    editable: false, apiBase: '', statesById: {}, settings, callbacks: {}, history
+  }));
+});
+
+const tag = P.get('datum') ? new Date(P.get('datum') + 'T12:00:00') : new Date();
+const zustand = AnlassModul.anlassZustand(P.has('aus') ? 'aus' : 'weihnachten', tag);
+document.body.classList.toggle('anlass-weihnachten', zustand.anlass === 'weihnachten');
+const schicht = document.getElementById('anlassSchicht');
+AnlassModul.schichtSetzen(schicht, zustand, { flocken: 36 });
+if (P.has('schnell')) {
+  schicht.style.setProperty('--anlass-takt-schlitten', '24s');
+  schicht.style.setProperty('--anlass-takt-ecke', '20s');
+  // Die Wartezeit vor dem ersten Auftritt gleich mit kuerzen.
+  schicht.querySelectorAll('.anlass-schlitten').forEach(e => e.style.animationDelay = '1s');
+  schicht.querySelectorAll('.anlass-figur').forEach(e => e.style.animationDelay = '1s');
+  schicht.querySelectorAll('.anlass-kranz').forEach(e => e.style.animationDelay = '11s');
+}
+if (P.has('steh')) {
+  schicht.querySelectorAll('.anlass-ecke').forEach(e => { e.style.animation = 'none'; e.style.transform = 'translate3d(0, 0, 0)'; });
+  schicht.querySelectorAll('.anlass-schlitten').forEach(e => { e.style.animation = 'none'; e.style.transform = 'translate3d(34vw, 2vh, 0) rotate(-2deg)'; });
+}
+document.getElementById('stand').textContent = zustand.anlass
+  ? `${tag.toLocaleDateString('de-DE')} · ${zustand.advent}. Advent · ${zustand.figur}`
+  : 'ohne Anlass';
+</script>
+</body>
+</html>

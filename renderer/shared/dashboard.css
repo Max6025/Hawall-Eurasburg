@@ -2073,3 +2073,182 @@ body.light-theme .notify-box .as-text strong { color: #17151d; }
 .bs-karten .card { min-height: 0; }
 .bs-leer { grid-column: 1 / -1; align-self: center; text-align: center;
   color: rgba(243, 241, 247, 0.6); font-size: 1.8vh; }
+
+
+/* === Anlass-Design: Weihnachten ===================================================================
+   Eine SCHICHT ueber Dashboard und Bildschirmschoner, kein drittes Farbschema -- hell und dunkel
+   bleiben, wie sie sind. Aufbau und Begruendung stehen in shared/anlass.js; hier steht, wie es
+   aussieht und sich bewegt.
+
+   Bewegt wird ausschliesslich per transform und opacity (Grafikeinheit), und alles Bewegte
+   traegt .anlass-bewegt -- an dieser einen Klasse haengen Anhalten und Abschalten. Die Schicht
+   ueber dem Dashboard haelt an, solange der Schoner liegt, die im Schoner, solange er nicht
+   liegt: Es schneit nie hinter einer deckenden Flaeche. */
+.anlass-schicht {
+  position: fixed; inset: 0; z-index: 60; pointer-events: none; overflow: hidden;
+}
+.bildschirmschoner > .anlass-schicht { position: absolute; z-index: 3; }
+.anlass-schicht.anlass-leer { display: none; }
+.bildschirmschoner.bs-sichtbar ~ .anlass-schicht .anlass-bewegt,
+.bildschirmschoner:not(.bs-sichtbar) > .anlass-schicht .anlass-bewegt { animation-play-state: paused; }
+
+/* --- Die Farben: Rot, Tannengruen und Gold statt Rot, Violett und Tuerkis. Dieselben vier
+   Wolken an denselben Stellen wie HINTERGRUND_WOLKEN, nur umgefaerbt. */
+body.anlass-weihnachten {
+  background:
+    radial-gradient(52% 44% at 14% 18%, rgba(196,40,54,0.38) 0%, transparent 68%),
+    radial-gradient(46% 40% at 86% 26%, rgba(28,124,80,0.36) 0%, transparent 66%),
+    radial-gradient(60% 46% at 74% 88%, rgba(190,36,56,0.26) 0%, transparent 70%),
+    radial-gradient(40% 34% at 38% 72%, rgba(230,172,60,0.22) 0%, transparent 68%),
+    #070b12;
+  background-attachment: fixed;
+}
+body.light-theme.anlass-weihnachten {
+  background:
+    radial-gradient(52% 44% at 14% 18%, rgba(230,98,108,0.28) 0%, transparent 68%),
+    radial-gradient(46% 40% at 86% 26%, rgba(96,182,134,0.30) 0%, transparent 66%),
+    radial-gradient(60% 46% at 74% 88%, rgba(232,112,122,0.20) 0%, transparent 70%),
+    radial-gradient(40% 34% at 38% 72%, rgba(242,198,112,0.28) 0%, transparent 68%),
+    #f1f4f9;
+  background-attachment: fixed;
+}
+body.anlass-weihnachten .lebendig span:nth-child(1) { background: radial-gradient(circle, rgba(204,42,56,0.38), transparent 68%); }
+body.anlass-weihnachten .lebendig span:nth-child(2) { background: radial-gradient(circle, rgba(30,128,82,0.36), transparent 68%); }
+body.anlass-weihnachten .lebendig span:nth-child(3) { background: radial-gradient(circle, rgba(232,174,62,0.26), transparent 68%); }
+body.light-theme.anlass-weihnachten .lebendig span:nth-child(1) { background: radial-gradient(circle, rgba(232,100,110,0.32), transparent 68%); }
+body.light-theme.anlass-weihnachten .lebendig span:nth-child(2) { background: radial-gradient(circle, rgba(98,186,136,0.32), transparent 68%); }
+body.light-theme.anlass-weihnachten .lebendig span:nth-child(3) { background: radial-gradient(circle, rgba(244,200,114,0.34), transparent 68%); }
+
+/* --- Schneehauben: Auf jeder Karte liegt Schnee. Die Lichtkante oben (.card::before) wird zur
+   Schneedecke, darunter haengen zwei Reihen ungleich grosser Bogen -- eine Reihe allein sieht
+   aus wie eine Borte, zwei mit verschiedenem Takt wie Schnee. Der Kartenaufbau bleibt
+   unangetastet: Die Haube liegt unter dem Inhalt (.card > * hat z-index 1). */
+body.anlass-weihnachten .card::before {
+  opacity: 1;
+  border-top: 0.55vh solid rgba(255,255,255,0.95);
+  background:
+    radial-gradient(ellipse 50% 100% at 50% 0, rgba(255,255,255,0.95) 0 97%, transparent 100%) 0.8vh 0 / 5.4vh 1.05vh repeat-x,
+    radial-gradient(ellipse 50% 100% at 50% 0, rgba(255,255,255,0.95) 0 97%, transparent 100%) 3.1vh 0 / 8.6vh 1.6vh repeat-x;
+}
+/* Weisser Schnee auf weissem Glas ist unsichtbar: im Hellen ein blaeulicher Schatten darunter. */
+body.light-theme.anlass-weihnachten .card::before {
+  filter: drop-shadow(0 0.25vh 0.3vh rgba(70,104,160,0.30));
+}
+
+/* --- Schnee. Ort, Groesse, Dauer und Drift kommen je Flocke aus anlass.js (einmal, beim
+   Aufbau). Drei Tiefen: fern klein und langsam, nah gross und schnell. */
+.anlass-flocke {
+  position: absolute; top: -3vh; width: var(--gr); height: var(--gr); border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.86) 45%, rgba(255,255,255,0) 72%);
+  opacity: var(--dk); will-change: transform;
+  animation: anlass-fallen var(--dauer) linear var(--versatz) infinite;
+}
+@keyframes anlass-fallen {
+  0%   { transform: translate3d(0, 0, 0); }
+  50%  { transform: translate3d(var(--drift), 53vh, 0); }
+  100% { transform: translate3d(calc(var(--drift) * -0.4), 106vh, 0); }
+}
+/* Im Hellen bekommt die Flocke einen blaeulichen Rand, sonst sieht man sie nicht. Der Schoner
+   ist immer dunkel und behaelt die weisse. */
+body.light-theme .anlass-schicht:not(.bildschirmschoner > *) .anlass-flocke {
+  background: radial-gradient(circle, #fff 0 36%, rgba(128,160,210,0.80) 58%, rgba(128,160,210,0) 74%);
+}
+
+/* --- Die Lichterkette am oberen Rand. Kabel als SVG (steht still), Birnen als HTML: Ihr
+   Funkeln ist dann Sache der Grafikeinheit. Vier Takte, damit nicht alle zugleich atmen. */
+.anlass-lichterkette { position: absolute; left: 0; right: 0; top: 0; height: 2vh;
+  color: color-mix(in srgb, var(--text) 42%, transparent); }
+.bildschirmschoner .anlass-lichterkette { color: rgba(243,241,247,0.42); }
+.anlass-kabel { position: absolute; inset: 0; width: 100%; height: 100%; display: block; overflow: visible; }
+.anlass-birne {
+  position: absolute; top: 0.95vh; width: 1.05vh; height: 1.5vh; margin-left: -0.52vh;
+  border-radius: 50% 50% 50% 50% / 36% 36% 64% 64%;
+  background: var(--birne);
+  box-shadow: 0 0 1.3vh 0.25vh var(--birne), inset 0.2vh 0.25vh 0.3vh rgba(255,255,255,0.55);
+  will-change: opacity;
+  animation: anlass-funkeln 3.6s ease-in-out infinite;
+}
+.anlass-birne.b1 { animation-delay: -0.9s; }
+.anlass-birne.b2 { animation-delay: -1.8s; }
+.anlass-birne.b3 { animation-delay: -2.7s; }
+@keyframes anlass-funkeln { 0%, 100% { opacity: 1; } 50% { opacity: 0.38; } }
+
+/* --- Der Schlitten. Ein Flug dauert rund ein Achtel des Takts, den Rest wartet er rechts
+   ausserhalb des Bildes. `backwards` haelt ihn vor dem ersten Flug links draussen. */
+.anlass-schlitten {
+  position: absolute; left: 0; top: 8vh; width: 46vh; will-change: transform;
+  animation: anlass-flug var(--anlass-takt-schlitten, 150s) linear 9s infinite backwards;
+}
+.anlass-schlitten svg { width: 100%; display: block; overflow: visible;
+  filter: drop-shadow(0 0.4vh 0.8vh rgba(0,0,0,0.35)); }
+.anlass-schlitten-wippe { animation: anlass-wippen 1.7s ease-in-out infinite alternate; will-change: transform; }
+@keyframes anlass-flug {
+  0%        { transform: translate3d(-50vh, 9vh, 0) rotate(-7deg); }
+  6.5%      { transform: translate3d(48vw, 0, 0) rotate(-2deg); }
+  13%, 100% { transform: translate3d(calc(100vw + 6vh), 8vh, 0) rotate(6deg); }
+}
+@keyframes anlass-wippen { from { transform: translate3d(0, -0.7vh, 0); } to { transform: translate3d(0, 0.7vh, 0); } }
+.anlass-nase { transform-box: fill-box; transform-origin: center;
+  animation: anlass-nase 0.9s ease-in-out infinite alternate; }
+@keyframes anlass-nase { from { transform: scale(0.8); opacity: 0.75; } to { transform: scale(1.35); opacity: 1; } }
+.anlass-funke { animation: anlass-funke 1.2s ease-in-out infinite alternate; }
+.anlass-funke.f2 { animation-delay: -0.5s; }
+.anlass-funke.f3 { animation-delay: -0.9s; }
+@keyframes anlass-funke { from { opacity: 0.15; } to { opacity: 1; } }
+
+/* --- Wer um die Ecke schaut: unten rechts die Figur, unten links der Adventskranz. Beide
+   tauchen hinter der Schneewehe auf, bleiben ein paar Sekunden und gehen wieder. Derselbe
+   Takt, um einen halben versetzt -- sie kommen nie gleichzeitig. */
+.anlass-ecke {
+  position: absolute; bottom: 0; will-change: transform;
+  transform: translate3d(0, 130%, 0);
+  animation: anlass-auftauchen var(--anlass-takt-ecke, 120s) ease-in-out infinite backwards;
+}
+.anlass-ecke svg { width: 100%; display: block; overflow: visible;
+  filter: drop-shadow(0 0.4vh 1vh rgba(0,0,0,0.38)); }
+.anlass-figur { right: 3.2vw; width: 19vh; animation-delay: 22s; }
+.anlass-kranz { left: 3.2vw; bottom: 1.8vh; width: 22vh; animation-name: anlass-kranz;
+  animation-delay: calc(22s + var(--anlass-takt-ecke, 120s) / 2); }
+@keyframes anlass-auftauchen {
+  0%          { transform: translate3d(0, 106%, 0) rotate(4deg); }
+  2.6%        { transform: translate3d(0, 6%, 0) rotate(-3deg); }
+  3.6%, 8.4%  { transform: translate3d(0, 11%, 0) rotate(0deg); }
+  10.6%, 100% { transform: translate3d(0, 106%, 0) rotate(4deg); }
+}
+/* Der Kranz steht hoeher als die Figur: Bei ihr darf der Bart im Schnee stecken, beim Kranz
+   waere genau das Gruen weg, an dem man ihn erkennt. Deshalb auch der weitere Weg nach unten. */
+@keyframes anlass-kranz {
+  0%          { transform: translate3d(0, 130%, 0); }
+  2.8%, 11%   { transform: translate3d(0, 0, 0); }
+  13.4%, 100% { transform: translate3d(0, 130%, 0); }
+}
+.anlass-winken { transform-box: view-box; transform-origin: 15px 104px;
+  animation: anlass-winken 0.62s ease-in-out infinite alternate; }
+.anlass-figur[data-figur="nikolaus"] .anlass-winken { transform-origin: 14px 128px; animation-duration: 1.5s; }
+@keyframes anlass-winken { from { transform: rotate(-13deg); } to { transform: rotate(15deg); } }
+.anlass-figur[data-figur="nikolaus"] .anlass-winken { animation-name: anlass-stab; }
+@keyframes anlass-stab { from { transform: rotate(-4deg); } to { transform: rotate(5deg); } }
+.anlass-flamme { transform-box: fill-box; transform-origin: 50% 100%;
+  animation: anlass-flackern 0.9s ease-in-out infinite alternate; }
+.anlass-flamme.fl1 { animation-duration: 1.15s; }
+.anlass-flamme.fl2 { animation-duration: 0.75s; }
+@keyframes anlass-flackern { from { transform: scale(0.9, 0.86) skewX(-4deg); } to { transform: scale(1.06, 1.1) skewX(4deg); } }
+
+/* --- Die Schneewehe am unteren Rand: zwei Huegelketten. Sie liegt VOR Figur und Kranz, die
+   dahinter auftauchen. */
+.anlass-wehe { position: absolute; left: 0; right: 0; bottom: 0; height: 3.4vh; }
+.anlass-wehe svg { width: 100%; height: 100%; display: block; }
+.anlass-wehe .wehe-hinten { fill: rgba(255,255,255,0.55); }
+.anlass-wehe .wehe-vorn { fill: rgba(255,255,255,0.96); }
+body.light-theme .anlass-schicht:not(.bildschirmschoner > *) .anlass-wehe {
+  filter: drop-shadow(0 -0.3vh 0.5vh rgba(70,104,160,0.26)); }
+body.light-theme .anlass-schicht:not(.bildschirmschoner > *) .anlass-wehe .wehe-hinten { fill: rgba(214,228,246,0.9); }
+
+/* --- Ohne Bewegung bleibt, was stillsteht: Farben, Schneehauben, Lichterkette, Schneewehe.
+   Schnee, Schlitten und die beiden Gaeste gibt es nur bewegt -- stehende Flocken waeren Flecken. */
+body.ohne-bewegung .anlass-schnee, body.ohne-bewegung .anlass-schlitten, body.ohne-bewegung .anlass-ecke { display: none; }
+body.ohne-bewegung .anlass-bewegt { animation: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  .anlass-schnee, .anlass-schlitten, .anlass-ecke { display: none; }
+  .anlass-bewegt { animation: none !important; }
+}

@@ -42,6 +42,10 @@
     // beide dieselbe Rechnung.
     this.tonVon = opt.tonVon === undefined ? 0 : opt.tonVon;
     this.tonBis = opt.tonBis === undefined ? 360 : opt.tonBis;
+    // Mehrere Ausschnitte statt eines: Zu Weihnachten sind es Rot, Gold und Tannengruen, und
+    // die liegen auf dem Farbkreis nicht nebeneinander. Bei der Geburt einer Form wird einer
+    // davon gewuerfelt. null heisst: der eine Ausschnitt oben.
+    this.toene = Array.isArray(opt.toene) && opt.toene.length ? opt.toene : null;
     this.formen = [];
     this.aktiv = false;
 
@@ -54,6 +58,12 @@
     }
   }
 
+  /** Ein Farbton in Grad: aus einem der Ausschnitte, sonst aus dem einen. */
+  Buehne.prototype._ton = function () {
+    const a = this.toene ? this.toene[Math.floor(Math.random() * this.toene.length)] : [this.tonVon, this.tonBis];
+    return ((z(a[0], a[1]) % 360) + 360) % 360;
+  };
+
   Buehne.prototype._gebaeren = function (form) {
     const el = form.el;
     const groesse = z(26, 62);
@@ -61,7 +71,7 @@
     el.style.height = groesse * z(0.7, 1.25) + 'vw';
     el.style.setProperty('--buehne-weich', Math.round(groesse * z(1.1, 1.9)) + 'px');
     el.style.background = 'radial-gradient(circle at ' + z(30, 70) + '% ' + z(30, 70) + '%, ' +
-      'hsl(' + z(this.tonVon, this.tonBis) + ' ' + z(72, 96) + '% ' + z(52, 68) + '%), transparent 70%)';
+      'hsl(' + this._ton() + ' ' + z(72, 96) + '% ' + z(52, 68) + '%), transparent 70%)';
     el.style.transition = 'none';
     el.style.left = z(-15, 100) + 'vw';
     el.style.top = z(-15, 100) + 'vh';

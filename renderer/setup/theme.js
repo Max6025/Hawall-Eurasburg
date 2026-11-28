@@ -65,6 +65,12 @@ async function load() {
   $('nightForceOn').checked = !!configRes.nightModeForceOn;
   $('systemWachhalten').checked = configRes.systemWachhalten !== false;
   $('debugModus').checked = !!configRes.debugModus;
+  // Diese drei wurden gespeichert, aber nie GELADEN: Die Seite zeigte immer die Vorgabe, und
+  // jedes Speichern -- auch wegen einer ganz anderen Einstellung -- setzte sie darauf zurueck.
+  $('hintergrundBewegung').checked = configRes.hintergrundBewegung !== false;
+  $('desktopHintergrund').checked = !!configRes.desktopHintergrund;
+  if (configRes.rueckkehrSekunden !== undefined) $('rueckkehrSekunden').value = configRes.rueckkehrSekunden;
+  $('anlassDesign').value = configRes.anlassDesign || 'auto';
 
   // Der Zugriffsschluessel kommt ausdruecklich NICHT zurueck (siehe /api/config) -- das Feld
   // bleibt leer und heisst "unveraendert". Ohne diesen Hinweis sieht es aus, als waere keiner
@@ -188,6 +194,7 @@ function alleFelder() {
   const felder = {
     hintergrundBewegung: $('hintergrundBewegung').checked,
     desktopHintergrund: $('desktopHintergrund').checked,
+    anlassDesign: $('anlassDesign').value,
     rueckkehrSekunden: zahl('rueckkehrSekunden', 90),
     sunEntity: $('sunEntity').value,
     notifyEntity: $('notifyEntity').value,
