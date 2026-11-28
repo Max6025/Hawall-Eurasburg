@@ -424,6 +424,16 @@ body { background: var(--page-bg-image, none) center/cover fixed, var(--bg); }
 }
 .card .ort-silhouette svg, .card .symbol-silhouette svg { width: 100%; height: 100%; display: block; }
 body.light-theme .card .ort-silhouette, body.light-theme .card .symbol-silhouette { opacity: 0.09; }
+/* Beim ORT sitzt die Blaesse an den BLAETTERN, nicht am Kasten: am stehenden SVG und an jedem
+   bewegten Teil einzeln (--ort-deck). Deckkraft auf einem Kasten, in dem sich Ebenen bewegen,
+   zwingt die Grafikeinheit, den ganzen Kasten in jedem Bild erst gesondert zu zeichnen und dann
+   abzublenden -- bei zehn Karten zehn solche Runden pro Bild. */
+.card .ort-silhouette { opacity: 1; --ort-deck: 0.075; }
+body.light-theme .card .ort-silhouette { opacity: 1; --ort-deck: 0.09; }
+.card .ort-silhouette .ort-bild > svg { opacity: var(--ort-deck); }
+.card .ort-silhouette .ort-teil { background: color-mix(in srgb, currentColor calc(var(--ort-deck) * 100%), transparent); }
+.card .ort-silhouette .ort-teil.ort-strahlen { background: none; opacity: var(--ort-deck); }
+.card .ort-silhouette .ort-teil.ort-flocken { background-color: transparent; opacity: calc(var(--ort-deck) * 2.4); }
 /* Die eingebauten Zeichen sind Striche, die Symbole aus Home Assistant Flaechen. Ein Strich
    von zwei Einheiten wird hier auf Kartenhoehe gezogen und waere ein Balken -- deshalb duenner.
    Eine Flaeche (MDI) bleibt unberuehrt, `stroke-width` wirkt auf sie nicht. */
@@ -479,23 +489,15 @@ body.light-theme .card .ort-silhouette, body.light-theme .card .symbol-silhouett
 }
 @keyframes ort-strahlen { to { transform: rotate(360deg); } }
 
-/* Aussen zum Fest: Es schneit um den Schneemann. Jede Flocke faellt durch den ganzen Kasten
-   (er ist rund sechzehnmal so hoch wie sie), die Spalten sind gegeneinander versetzt. */
+/* Aussen zum Fest: Es schneit um den Schneemann. EINE Lage (wie der grosse Schnee, siehe
+   anlass.css): ein Bild mit Flocken, zweimal untereinander gekachelt, das um seine halbe Hoehe
+   nach unten laeuft. Fuenf einzelne Flocken je Karte waeren fuenf Ebenen je Karte. */
 .card .ort-flocken {
-  opacity: 0;
+  border-radius: 0; background-repeat: repeat-y; background-size: 100% 50%;
   animation: ort-flocken 7s linear infinite;
   animation-delay: var(--ph-flocken, 0s);
 }
-.card .ort-flocken.f2 { animation-delay: calc(var(--ph-flocken, 0s) + 2.9s); }
-.card .ort-flocken.f3 { animation-delay: calc(var(--ph-flocken, 0s) + 1.3s); }
-.card .ort-flocken.f4 { animation-delay: calc(var(--ph-flocken, 0s) + 4.6s); }
-.card .ort-flocken.f5 { animation-delay: calc(var(--ph-flocken, 0s) + 5.8s); }
-@keyframes ort-flocken {
-  0%   { opacity: 0;   transform: translate3d(0, 0, 0); }
-  8%   { opacity: 0.95; }
-  88%  { opacity: 0.95; }
-  100% { opacity: 0;   transform: translate3d(90%, 1700%, 0); }
-}
+@keyframes ort-flocken { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, 50%, 0); } }
 
 /* Treppenhaus: Der Laeufer steigt Stufe fuer Stufe, verweilt kurz auf jeder, verschwindet oben
    und faengt unten wieder an. --schritt ist eine Stufe in Prozent seiner eigenen Groesse. */
@@ -523,7 +525,7 @@ body.light-theme .card .ort-silhouette, body.light-theme .card .symbol-silhouett
 
 @media (prefers-reduced-motion: reduce) {
   .card .ort-teil { animation: none; }
-  .card .ort-rauch, .card .ort-flocken { opacity: 0; }
+  .card .ort-rauch { opacity: 0; }
 }
 
 /* Leichte Schrift statt halbfett: Das ist derselbe Zug wie bei der Ueberschrift des
@@ -2043,6 +2045,15 @@ body.light-theme .notify-box .as-text strong { color: #17151d; }
   opacity: 1; visibility: visible;
   transition: opacity var(--blende-dauer, 2500ms) ease, visibility 0s linear 0s;
 }
+
+/* Liegt der Schoner, RUHT das Dashboard darunter. Er deckt es vollstaendig ab -- aber was dort
+   animiert (die Pfeile der Energiekarte, eine drehende Flocke, die Ortszeichen), lief unsichtbar
+   weiter und hielt die Grafikeinheit in jedem Bild beschaeftigt. Auf dem Surface Go gemessen:
+   Ohne jede sichtbare Bewegung kostete das 20 % Renderer und 30 % Grafikprozess, mit ruhendem
+   Dashboard 3 % und 1 %. `content-visibility: hidden` haelt Darstellung UND Animationen an und
+   behaelt den Zustand; gesetzt wird die Klasse von dashboard.html erst, wenn die Blende des
+   Schoners durch ist, und weggenommen, BEVOR er aufsteht. */
+body.schoner-deckt .app { content-visibility: hidden; }
 
 .bildschirmschoner {
   position: fixed; inset: 0; z-index: 9990;

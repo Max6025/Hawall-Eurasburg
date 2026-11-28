@@ -69,22 +69,32 @@ test('Die Signatur aendert sich genau dann, wenn sich etwas Sichtbares aendert',
   assert.strictEqual(s(2026, 7, 1), '', 'ohne Anlass leer');
 });
 
-test('Die Flocken sind in drei Tiefen verteilt, bleiben im Bild und fallen schon beim Erscheinen', () => {
+// Seit 1.0.43 ist der Schnee DREI LAGEN statt vieler einzelner Flocken: Jede Flocke als eigene
+// Ebene kostete den Compositor-Faden auf dem Surface Go 45 % eines Kerns.
+test('Der Schnee ist drei Lagen: fern klein und langsam, nah gross und schnell', () => {
   let n = 1;
   const zufall = () => { n = (n * 9301 + 49297) % 233280; return n / 233280; };
-  const flocken = A.flockenDaten(30, zufall);
-  assert.strictEqual(flocken.length, 30);
-  for (const f of flocken) {
-    assert.ok(f.links >= 0 && f.links <= 100, 'ausserhalb des Bildes');
-    assert.ok(f.versatz <= 0 && f.versatz >= -f.dauer, 'der Versatz muss in der Vergangenheit liegen');
-    assert.ok(f.dauer >= 10 && f.dauer <= 30);
+  const lagen = A.flockenDaten(60, zufall);
+  assert.strictEqual(lagen.length, 3);
+  const stueck = lagen.reduce((s, l) => s + l.flocken.length, 0);
+  assert.ok(stueck >= 58 && stueck <= 62, `${stueck} Flocken statt rund 60`);
+  for (const l of lagen) for (const f of l.flocken) {
+    assert.ok(f.x >= 0 && f.x <= 1680 && f.y >= 0 && f.y <= 1000, 'ausserhalb der Kachel');
+    assert.ok(f.deckkraft > 0.4 && f.deckkraft <= 1);
   }
-  const mittel = (t, k) => { const a = flocken.filter(f => f.tiefe === t); return a.reduce((s, f) => s + f[k], 0) / a.length; };
-  assert.ok(mittel(0, 'groesse') < mittel(2, 'groesse'), 'ferne Flocken sind kleiner');
-  assert.ok(mittel(0, 'dauer') > mittel(2, 'dauer'), 'ferne Flocken fallen langsamer');
+  const mittel = (l, k) => l.flocken.reduce((s, f) => s + f[k], 0) / l.flocken.length;
+  assert.ok(mittel(lagen[0], 'r') < mittel(lagen[2], 'r'), 'ferne Flocken sind kleiner');
+  assert.ok(lagen[0].dauer > lagen[2].dauer, 'ferne Flocken fallen langsamer');
+  assert.ok(lagen[0].flocken.length > lagen[2].flocken.length, 'in der Ferne sind es mehr');
   // Derselbe Zufall, dieselben Flocken.
-  n = 1; assert.deepStrictEqual(A.flockenDaten(30, zufall), flocken);
-  assert.strictEqual(A.flockenDaten(undefined).length, A.FLOCKEN_VORGABE);
+  n = 1; assert.deepStrictEqual(A.flockenDaten(60, zufall), lagen);
+  // Und im Markup: genau SECHS bewegte Ebenen fuer allen Schnee, egal wie viele Flocken.
+  for (const anzahl of [20, 60, 200]) {
+    const html = A.schneeHtml(anzahl, zufall);
+    assert.strictEqual((html.match(/anlass-bewegt/g) || []).length, 6, `${anzahl} Flocken`);
+    assert.strictEqual((html.match(/class="anlass-schneelage/g) || []).length, 3);
+    assert.ok(html.includes("url('data:image/svg+xml,"), 'die Flocken stehen als Bild in der Lage');
+  }
 });
 
 test('Der Adventskranz hat vier Kerzen, und so viele brennen, wie Advent ist', () => {
@@ -110,7 +120,7 @@ test('Die Schicht enthaelt alles -- und ohne Anlass nichts', () => {
   }
   assert.ok(gross.includes('Noch 18 Tage'), 'das Schild zaehlt');
   assert.ok(gross.includes('data-kerzen="2"'));
-  assert.strictEqual((html.match(/class="anlass-flocke/g) || []).length, 12);
+  assert.strictEqual((html.match(/class="anlass-schneelage/g) || []).length, 3);
   assert.ok(html.includes('data-figur="nikolaus"'), 'am 6.12. der Nikolaus');
   assert.ok(html.includes('data-kerzen="2"'), 'am 6.12. zwei Kerzen');
   assert.strictEqual(A.schichtHtml(A.anlassZustand('aus', tag(2026, 12, 6))), '');
@@ -213,7 +223,9 @@ test('Die Girlande haengt in acht Boegen: Schleifen an den Enden, Lichter darauf
   const html = A.girlandeHtml(zufall);
   assert.strictEqual((html.match(/class="anlass-schleife"/g) || []).length, A.BOEGEN + 1);
   assert.strictEqual((html.match(/class="anlass-haenger /g) || []).length, A.BOEGEN);
-  assert.strictEqual((html.match(/class="anlass-birne /g) || []).length, A.BOEGEN * 4);
+  assert.strictEqual((html.match(/class="anlass-birne"/g) || []).length, A.BOEGEN * 4);
+  // 32 Birnen, aber nur vier bewegte Ebenen: Sie atmen in Gruppen.
+  assert.strictEqual((html.match(/class="anlass-lichter anlass-bewegt/g) || []).length, 4);
   // Nichts haengt ausserhalb des Bildes.
   for (const m of html.matchAll(/left:([0-9.]+)%/g)) assert.ok(Number(m[1]) >= 0 && Number(m[1]) <= 100, `left ${m[1]}%`);
   // Keine zwei benachbarten Anhaenger sind dieselbe Zeichnung.
@@ -439,4 +451,32 @@ test('Die Ton-Einstellung reist durch Server und Einstellungsseite, samt Probekn
   assert.match(js, /\$\('anlassTon'\)\.checked = configRes\.anlassTon !== false/);
   assert.ok(html.includes('src="/shared/anlass.js"'), 'der Knopf "Hier anhoeren" braucht das Modul');
   assert.match(lies('renderer/dashboard.html'), /befehl\.befehl === 'anlass-ton'/);
+});
+
+// --- Wenige Ebenen ------------------------------------------------------------------------------
+//
+// 1.0.42 bewegte nur noch HTML ueber transform und opacity -- der Hauptstrang lag bei 2,5 %.
+// Trotzdem kostete der Compositor-Faden 45 % eines Kerns und der Grafikprozess 64 %: Rund
+// zweihundert einzelne Ebenen wollen in jedem Bild fortgeschrieben und gezeichnet werden.
+// Fluessig heisst deshalb auch: WENIGE Ebenen. Diese Zahl ist eine Obergrenze, kein Ziel.
+test('Die ganze Schicht bewegt hoechstens fuenfzig Ebenen', () => {
+  for (const szene of ['klein', 'gross']) {
+    const html = A.schichtHtml(A.anlassZustand('auto', tag(2026, 12, 20)), { flocken: 60, szene });
+    const bewegt = (html.match(/anlass-bewegt/g) || []).length;
+    assert.ok(bewegt <= 50, `${szene}: ${bewegt} bewegte Ebenen`);
+  }
+});
+
+test('Liegt der Schoner, ruht das Dashboard darunter -- und wacht vor ihm auf', () => {
+  const css = lies('renderer/shared/dashboard.css');
+  assert.match(css, /body\.schoner-deckt \.app \{ content-visibility: hidden; \}/);
+  const seite = lies('renderer/dashboard.html');
+  // Aufwecken: ERST das Dashboard, DANN der Schoner -- an beiden Stellen, an denen er aufsteht.
+  const stellen = [...seite.matchAll(/dashboardRuhen\(false\);\s*schoner\.verbergen\(\);/g)];
+  assert.strictEqual(stellen.length, (seite.match(/schoner\.verbergen\(\);/g) || []).length,
+    'jedes schoner.verbergen() braucht davor dashboardRuhen(false)');
+  assert.match(seite, /schoner\.zeigen\(\);\s*dashboardRuhen\(true\);/);
+  // Und ein laufender Zeitgeber wird beim Aufwecken abgeraeumt, sonst schliefe es wieder ein.
+  const fn = seite.slice(seite.indexOf('function dashboardRuhen'), seite.indexOf('function dashboardRuhen') + 500);
+  assert.match(fn, /clearTimeout\(dashboardRuheTakt\)/);
 });

@@ -1065,6 +1065,24 @@ function anlassAnwenden(erzwingen) {
   applyTheme();
 }
 
+// Liegt der Schoner, ruht das Dashboard darunter (body.schoner-deckt, siehe dashboard.css): Was
+// dort animiert, lief sonst unsichtbar weiter und kostete in jedem Bild. Zwei Dinge haengen
+// daran, und beide sind die Reihenfolge:
+//   - AN erst, wenn die Blende des Schoners durch ist (700 ms) -- vorher scheint das Dashboard
+//     noch durch, und es verschwaende sichtbar.
+//   - AUS sofort und VOR schoner.verbergen() -- wer antippt, muss das Dashboard sehen, sobald
+//     der Schoner zu weichen beginnt. Ein Zeitgeber, der noch laeuft, wird dabei abgeraeumt:
+//     Sonst schliefe das Dashboard eine Sekunde nach dem Aufwecken wieder ein.
+let dashboardRuheTakt = 0;
+function dashboardRuhen(an) {
+  clearTimeout(dashboardRuheTakt);
+  dashboardRuheTakt = 0;
+  if (!an) { document.body.classList.remove('schoner-deckt'); return; }
+  dashboardRuheTakt = setTimeout(() => {
+    if (schoner && schoner.istSichtbar()) document.body.classList.add('schoner-deckt');
+  }, 900);
+}
+
 // Die Auftritte laufen nur in der Schicht, die gerade zu sehen ist: liegt der Schoner, in
 // seiner; sonst vorn. Gerufen nach jedem Hinlegen und Aufstehen und nach jedem Neubau. Ohne
 // "Hintergrund langsam bewegen" laeuft keiner.
@@ -1639,12 +1657,14 @@ function schonerPruefen() {
   if (schonen) {
     schonerHintergrundAnwenden();
     schoner.zeigen();
+    dashboardRuhen(true);
     anlassGaesteAnpassen();
     // ERST zeigen, DANN aufraeumen. Der Schoner liegt auf z-index 9990 und deckt das
     // Dashboard vollstaendig ab -- der Wechsel passiert also hinter ihm und ist nicht zu
     // sehen. Umgekehrt saehe man ihn: einen Augenblick das Hauptdashboard, dann den Schoner.
     hinterDemSchonerAufraeumen();
   } else {
+    dashboardRuhen(false);
     schoner.verbergen();
     anlassGaesteAnpassen();
   }
@@ -1783,6 +1803,7 @@ async function schonerKartenBauen() {
 function schonerWecken() {
   letzteBedienung = Date.now();
   if (!schoner || !schoner.istSichtbar()) return;
+  dashboardRuhen(false);
   schoner.verbergen();
   anlassGaesteAnpassen();
   helligkeitAnpassen();

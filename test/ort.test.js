@@ -87,7 +87,7 @@ test('Jeder Ort hat seine eigene Bewegung, in Symbol und Silhouette, mit der Dau
     assert.ok(Array.isArray(eintrag.animationen) && eintrag.animationen.length > 0, `${ort} bewegt sich nicht`);
     for (const [name, dauer, wechselnd] of eintrag.animationen) {
       assert.ok(!gesehen.has(name), `${name} doppelt`); gesehen.add(name);
-      assert.ok(eintrag.symbol.includes('class="ort-' + name) || eintrag.symbol.includes(`ort-${name}`), `${ort}: ort-${name} fehlt im Symbol`);
+      // Das Symbol oben links steht seit 1.0.43 still -- bewegt wird nur die Silhouette.
       assert.ok(eintrag.silhouette.includes(`ort-${name}`), `${ort}: ort-${name} fehlt in der Silhouette`);
       const regel = new RegExp(`animation:\\s*ort-${name}\\s+([0-9.]+)s[^;]*?(alternate)?;`);
       const m = regel.exec(css);
@@ -117,8 +117,14 @@ test('Was sich an einem Ortszeichen bewegt, ist HTML ueber der Zeichnung, nie ei
       for (const block of html.match(/<svg[\s\S]*?<\/svg>/g) || []) {
         assert.ok(!/class="ort-/.test(block), `${ort}/${welches}: bewegtes Teil im SVG`);
       }
-      for (const [name] of eintrag.animationen) {
-        assert.match(html, new RegExp(`<i class="ort-teil ort-${name}`), `${ort}/${welches}: ort-${name} ist kein eigenes Teil`);
+      if (welches === 'Symbol') {
+        // Das kleine Symbol steht still: Jede bewegte Ebene zaehlt, und bei zwanzig Pixeln sieht
+        // die Bewegung kaum jemand. Sie gehoert der grossen Silhouette.
+        assert.ok(!html.includes('ort-teil'), `${ort}: das Symbol bewegt sich`);
+      } else {
+        for (const [name] of eintrag.animationen) {
+          assert.match(html, new RegExp(`<i class="ort-teil ort-${name}`), `${ort}/${welches}: ort-${name} ist kein eigenes Teil`);
+        }
       }
     }
   }

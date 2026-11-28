@@ -40,6 +40,9 @@ body.anlass-weihnachten.anlass-tag {
    haelt dashboard.html zusaetzlich an (buehneSperren), damit auch kein Zeitgeber mehr laeuft. */
 body.anlass-weihnachten .lebendig { display: none; }
 body.anlass-weihnachten .bs-buehne { display: none; }
+/* Das Punktraster des Schoners traegt eine Maske -- die kostet die Grafikeinheit in jedem Bild
+   eine eigene Runde ueber den ganzen Schirm, und unter den bunten Karten sieht man es nicht. */
+body.anlass-weihnachten .bs-raster { display: none; }
 /* Der Schoner ist immer Nacht: Er ist die Ruheflaeche, und die Lichter leuchten nur im Dunkeln. */
 body.anlass-weihnachten .bildschirmschoner {
   background: linear-gradient(180deg, #0a1236 0%, #171a52 58%, #3a2a6e 100%);
@@ -160,8 +163,8 @@ body.anlass-weihnachten .card:not(.type-photo):not(.type-radar):not(.type-media_
    Festfassung (Treppe, Sofa) bleiben so blass wie vorher. */
 body.anlass-weihnachten .ort-bild.ort-alltag.hat-fest { display: none; }
 body.anlass-weihnachten .ort-bild.ort-fest { display: block; }
-body.anlass-weihnachten .card .ort-silhouette { opacity: 0.27; }
-body.anlass-weihnachten .card .ort-silhouette .ort-bild:not(.ort-fest) { opacity: 0.45; }
+body.anlass-weihnachten .card .ort-silhouette { --ort-deck: 0.27; }
+body.anlass-weihnachten .card .ort-silhouette .ort-bild:not(.ort-fest) { --ort-deck: 0.13; }
 /* Ein Tor, das zu lange braucht, faerbt sich rot -- auf einer roten Karte saehe man es nicht.
    Die Warnung bekommt deshalb eine dunkle Karte, auf der Rot leuchtet. */
 body.anlass-weihnachten .card.tor-ueberfaellig { --wf1: #3a0d16; --wf2: #16060a; }
@@ -206,18 +209,19 @@ body.anlass-weihnachten .card::before {
 .anlass-schleife { position: absolute; top: -0.5vh; width: 5.2vh; margin-left: -2.6vh; }
 .anlass-schleife svg { width: 100%; display: block; filter: drop-shadow(0 0.3vh 0.4vh rgba(0,0,0,0.3)); }
 
-/* Die Lichter auf den Boegen. Vier Takte, damit nicht alle zugleich atmen. */
+/* Die Lichter auf den Boegen: 32 Birnen in VIER Gruppen. Jede Gruppe ist eine Ebene, die als
+   Ganzes atmet; die Birnen darin stehen still und werden einmal gemalt, samt ihrem Schein. */
+.anlass-lichter { position: absolute; inset: 0; will-change: opacity;
+  animation: anlass-funkeln 3.6s ease-in-out infinite; }
+.anlass-lichter.b1 { animation-delay: -0.9s; }
+.anlass-lichter.b2 { animation-delay: -1.8s; }
+.anlass-lichter.b3 { animation-delay: -2.7s; }
 .anlass-birne {
   position: absolute; width: 1.2vh; height: 1.7vh; margin: 0.1vh 0 0 -0.6vh;
   border-radius: 50% 50% 50% 50% / 36% 36% 64% 64%;
   background: var(--birne);
   box-shadow: 0 0 1.5vh 0.35vh var(--birne), inset 0.2vh 0.25vh 0.3vh rgba(255,255,255,0.6);
-  will-change: opacity;
-  animation: anlass-funkeln 3.6s ease-in-out infinite;
 }
-.anlass-birne.b1 { animation-delay: -0.9s; }
-.anlass-birne.b2 { animation-delay: -1.8s; }
-.anlass-birne.b3 { animation-delay: -2.7s; }
 @keyframes anlass-funkeln { 0%, 100% { opacity: 1; } 50% { opacity: 0.36; } }
 
 /* Die Anhaenger: Kugel, Stern, Zuckerstange, Glocke -- jeder an seinem Faden, jeder pendelt in
@@ -242,20 +246,26 @@ body.anlass-weihnachten .card::before {
 .anlass-teil { position: absolute; display: block; will-change: transform, opacity; }
 .anlass-teil > svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .anlass-fleck { border-radius: 50%; }
+/* Eine Gruppe ist EIN bewegtes Teil mit stehenden Punkten darin. */
+.anlass-gruppe { pointer-events: none; }
+.anlass-punkt { position: absolute; display: block; border-radius: 50%; }
 
-/* --- Schnee. Ort, Groesse, Dauer und Drift kommen je Flocke aus anlass.js (einmal, beim
-   Aufbau). Drei Tiefen: fern klein und langsam, nah gross und schnell. */
-.anlass-flocke {
-  position: absolute; top: -3vh; width: var(--gr); height: var(--gr); border-radius: 50%;
-  background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.9) 48%, rgba(255,255,255,0) 74%);
-  opacity: var(--dk); will-change: transform;
-  animation: anlass-fallen var(--dauer) linear var(--versatz) infinite;
+/* --- Schnee: drei Lagen statt vieler Flocken. Eine Lage ist ein Bild voller Flocken (aus
+   anlass.js, einmal gewuerfelt), zweimal untereinander gekachelt; sie laeuft einmal um ihre
+   Hoehe nach unten und beginnt nahtlos von vorn. Das seitliche Schwanken liegt auf dem Element
+   darum -- auf der Lage selbst spraenge sie am Ende jeder Runde zur Seite. Sechs bewegte Ebenen
+   fuer beliebig viel Schnee; einzelne Flocken kosteten den Compositor 45 % eines Kerns. */
+.anlass-schnee { position: absolute; inset: 0; overflow: hidden; }
+.anlass-schwank { position: absolute; left: -6vw; top: 0; width: 112vw; height: 100vh; will-change: transform;
+  animation: anlass-schwanken var(--takt, 13s) ease-in-out infinite alternate; }
+@keyframes anlass-schwanken {
+  from { transform: translate3d(calc(var(--schwank, 3vw) * -1), 0, 0); }
+  to   { transform: translate3d(var(--schwank, 3vw), 0, 0); }
 }
-@keyframes anlass-fallen {
-  0%   { transform: translate3d(0, 0, 0); }
-  50%  { transform: translate3d(var(--drift), 53vh, 0); }
-  100% { transform: translate3d(calc(var(--drift) * -0.4), 106vh, 0); }
-}
+.anlass-schneelage { position: absolute; left: 0; top: -100vh; width: 100%; height: 200vh;
+  background-repeat: repeat-y; background-size: 100% 100vh; will-change: transform;
+  animation: anlass-schneien var(--dauer, 19s) linear infinite; }
+@keyframes anlass-schneien { from { transform: translate3d(0, 0, 0); } to { transform: translate3d(0, 100vh, 0); } }
 
 /* --- Die Auftritte: was kommt und wieder geht. Jeder steht unsichtbar bereit; der Zeitgeber in
    anlass.js gibt ihm die Klasse `laeuft`, dazu Hoehe, Seite und Dauer als Variablen -- einmal
@@ -286,8 +296,6 @@ body.anlass-weihnachten .card::before {
 .anlass-auftritt.laeuft .anlass-nase { animation: anlass-nase 0.9s ease-in-out infinite alternate; }
 @keyframes anlass-nase { from { transform: scale(0.85); opacity: 0.7; } to { transform: scale(1.4); opacity: 1; } }
 .anlass-auftritt.laeuft .anlass-funke { animation: anlass-funke 1.2s ease-in-out infinite alternate; }
-.anlass-auftritt.laeuft .anlass-funke.f2 { animation-delay: -0.5s; }
-.anlass-auftritt.laeuft .anlass-funke.f3 { animation-delay: -0.9s; }
 @keyframes anlass-funke { from { opacity: 0.15; } to { opacity: 1; } }
 
 /* Wer hinter dem Schnee hervorschaut: der Weihnachtsmann (am 5./6.12. der Nikolaus), auf dem
@@ -399,7 +407,7 @@ body.anlass-weihnachten .card::before {
 /* Was sich in der Szene bewegt: die Lichter am Baum, sein Stern, der Rauch aus dem Kamin, der
    Schein in den Fenstern, der Arm des Schneemanns, die Flammen am Kranz. Alles kleine eigene
    Ebenen, alles langsam. Der Kranz auf dem Dashboard flackert nur, solange er zu sehen ist. */
-.anlass-baumlicht { box-shadow: 0 0 0.9vh 0.15vh currentColor; animation: anlass-funkeln 2.8s ease-in-out infinite; }
+.anlass-baumlicht { animation: anlass-funkeln 2.8s ease-in-out infinite; }
 .anlass-baumlicht.b1 { animation-delay: -0.7s; }
 .anlass-baumlicht.b2 { animation-delay: -1.4s; }
 .anlass-baumlicht.b3 { animation-delay: -2.1s; }

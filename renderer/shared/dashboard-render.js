@@ -1486,8 +1486,20 @@
     return `<i class="ort-teil ${klasse}" style="left:${pz(cx - r)};top:${pz(cy - r)};width:${pz(2 * r)};height:${pz(2 * r)}${stil ? ';' + stil : ''}"></i>`;
   }
   const ortRauch = (cx, cy, r) => ['r1', 'r2', 'r3'].map(k => ortFleck('ort-rauch ' + k, cx, cy, r)).join('');
-  // Schneeflocken, die durch den Kasten fallen: je eine Spalte, je ein Versatz.
-  const ortFlocken = (r, spalten) => spalten.map((x, i) => ortFleck('ort-flocken f' + (i + 1), x, -r, r)).join('');
+  // Schneefall als EINE Lage: ein Bild mit Flocken, zweimal untereinander gekachelt, das um
+  // seine halbe Hoehe nach unten laeuft (siehe .ort-flocken). Einzelne Flocken waeren eine
+  // Ebene je Flocke und Karte -- bei vier Aussen-Karten zwanzig Ebenen fuer ein bisschen Schnee.
+  function ortSchneefall(flocken) {
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">' +
+      flocken.map(([x, y, r]) => `<circle cx="${x}" cy="${y}" r="${r}" fill="#fff"/>`).join('') + '</svg>';
+    return `<i class="ort-teil ort-flocken" style="left:0;top:-100%;width:100%;height:200%;` +
+      `background-image:url('data:image/svg+xml,${encodeURIComponent(svg)}')"></i>`;
+  }
+  // DAS SYMBOL OBEN LINKS STEHT STILL. Bis 1.0.42 bewegte es sich mit -- zwei bis drei eigene
+  // Ebenen je Karte fuer eine Bewegung, die bei zwanzig Pixeln Symbolgroesse kaum jemand sieht.
+  // Auf dem Surface Go zaehlt jede Ebene (der Compositor-Faden lag bei 45 % eines Kerns); die
+  // Bewegung gehoert der grossen Silhouette. Im Symbol ist sie als Standbild gezeichnet.
+  const STEHT = ' fill="currentColor" stroke="none"';
 
   // -- Innen: das Haus. Alltag mit rauchendem Kamin; zum Fest liegt Schnee auf dem Dach.
   const HAUS_SYMBOL = '<path d="M3 13.5 12 6.5l9 7"/><path d="M5.5 12v9.5h13V12"/><path d="M10 21.5V16h4v5.5"/><path d="M16 9.6V6h2.5v6"/>';
@@ -1521,8 +1533,8 @@
       text: 'Innen',
       // Der Kamin ist der Traeger der Bewegung: Ein Haus, aus dem Rauch steigt, ist ein
       // bewohntes Haus -- und genau das heisst "innen".
-      symbol: ortBild(ORT_STRICH, HAUS_SYMBOL, ortRauch(17.25, 4.2, 1.2), 'ort-alltag hat-fest') +
-              ortBild(ORT_STRICH, HAUS_SCHNEE_SYMBOL, ortRauch(17.4, 3.9, 1.2), 'ort-fest'),
+      symbol: ortBild(ORT_STRICH, HAUS_SYMBOL + `<circle cx="17.3" cy="3.6" r="1.1"${STEHT} opacity=".75"/><circle cx="18.8" cy="1.5" r=".8"${STEHT} opacity=".5"/>`, '', 'ort-alltag hat-fest') +
+              ortBild(ORT_STRICH, HAUS_SCHNEE_SYMBOL + `<circle cx="17.5" cy="3.4" r="1.1"${STEHT} opacity=".75"/><circle cx="19" cy="1.4" r=".8"${STEHT} opacity=".5"/>`, '', 'ort-fest'),
       silhouette: ortBild(ORT_FLAECHE, HAUS_FLAECHE, ortRauch(17.3, 4.2, 1.3), 'ort-alltag hat-fest') +
                   ortBild(ORT_FLAECHE, HAUS_SCHNEE_FLAECHE, ortRauch(17.3, 3, 1.3), 'ort-fest'),
       animationen: [['rauch', 4.2, false]]
@@ -1541,10 +1553,10 @@
     // und zwar nur dort.
     aussen: {
       text: 'Außen',
-      symbol: ortBild(ORT_STRICH, '<circle cx="12" cy="12" r="4.2"/>', ortStrahlen(ORT_STRICH, SONNE_STRAHLEN_SYMBOL), 'ort-alltag hat-fest') +
-              ortBild(ORT_STRICH, SCHNEEMANN_SYMBOL, ortFlocken(1, [3.4, 20.4]), 'ort-fest'),
+      symbol: ortBild(ORT_STRICH, '<circle cx="12" cy="12" r="4.2"/>' + SONNE_STRAHLEN_SYMBOL, '', 'ort-alltag hat-fest') +
+              ortBild(ORT_STRICH, SCHNEEMANN_SYMBOL + `<circle cx="3.2" cy="5" r="1"${STEHT}/><circle cx="20.6" cy="7.4" r="1"${STEHT}/>`, '', 'ort-fest'),
       silhouette: ortBild(ORT_FLAECHE, '<circle cx="12" cy="12" r="5.4"/>', ortStrahlen(ORT_FLAECHE, SONNE_STRAHLEN_FLAECHE), 'ort-alltag hat-fest') +
-                  ortBild(ORT_FLAECHE, SCHNEEMANN_FLAECHE, ortFlocken(0.75, [2.2, 6.4, 18.2, 21.8, 12.4]), 'ort-fest'),
+                  ortBild(ORT_FLAECHE, SCHNEEMANN_FLAECHE, ortSchneefall([[2.2, 3, .8], [6.6, 14, .65], [18.4, 8, .8], [21.6, 19, .65], [12.6, 22.5, .55], [14.8, 1.2, .55]]), 'ort-fest'),
       animationen: [['strahlen', 60, false], ['flocken', 7, false]]
     },
     // TREPPENHAUS, der dritte Ort. Der Anlass: Im Haus haengen Fuehler im Wohnbereich UND im
@@ -1562,8 +1574,7 @@
     // der EIGENEN Groesse rechnet, traegt jeder seinen Schritt als --schritt mit.
     treppenhaus: {
       text: 'Treppenhaus',
-      symbol: ortBild(ORT_STRICH, '<path d="M3 21v-4.5h4.5V12H12V7.5h4.5V3H21v18z"/>',
-        ortFleck('ort-laeufer', 5.25, 14.8, 1.4, '--schritt:' + (4.5 / 2.8 * 100).toFixed(1) + '%')),
+      symbol: ortBild(ORT_STRICH, '<path d="M3 21v-4.5h4.5V12H12V7.5h4.5V3H21v18z"/>' + `<circle cx="9.75" cy="10.3" r="1.4"${STEHT}/>`),
       silhouette: ortBild(ORT_FLAECHE, '<path d="M1.5 22.5v-5h4.6v-4.6h4.6V8.3h4.6V3.7h7.2v18.8z"/>',
         ortFleck('ort-laeufer', 3.8, 15.6, 1.5, '--schritt:' + (4.6 / 3 * 100).toFixed(1) + '%')),
       animationen: [['laeufer', 6, false]]
@@ -1575,8 +1586,8 @@
     wohnzimmer: {
       text: 'Wohnzimmer',
       symbol: ortBild(ORT_STRICH,
-        '<path d="M4 11V8.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2V11"/><path d="M2 13a2 2 0 0 1 4 0v2h7v-2a2 2 0 0 1 4 0v5H2z"/><path d="M4 20v1.5M15 20v1.5"/><path d="M20.5 21.5V11M18.5 21.5h4"/><path d="M17.5 11l1.2-4.5h3.6l1.2 4.5z"/>',
-        '', '', ortFleck('ort-schein', 20.5, 9.3, 3.8)),
+        `<circle cx="20.5" cy="9.3" r="3.8"${STEHT} opacity=".28"/>` +
+        '<path d="M4 11V8.5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2V11"/><path d="M2 13a2 2 0 0 1 4 0v2h7v-2a2 2 0 0 1 4 0v5H2z"/><path d="M4 20v1.5M15 20v1.5"/><path d="M20.5 21.5V11M18.5 21.5h4"/><path d="M17.5 11l1.2-4.5h3.6l1.2 4.5z"/>'),
       // Die Silhouette haengt rechts unten ueber den Kartenrand hinaus (right: -4 %); die Lampe
       // steht deshalb nicht am rechten Rand des Bildes, sondern bei x = 17, sonst ist sie weg.
       silhouette: ortBild(ORT_FLAECHE,

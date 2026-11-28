@@ -1525,8 +1525,25 @@ die ganze Zeichnung neu. Fünf Regeln, jede mit Test:
    `visibility: hidden`, nicht nur angehalten. Und die großen weichgezeichneten Flächen des
    Alltags (`.lebendig`, die Bühne) sind zu Weihnachten aus — unter deckend bunten Karten sieht
    man sie nicht (`buehneSperren()`).
-5. **Nachmessen statt behaupten**: `werkzeuge/last-messen.ps1` auf dem Panel (per SSH) nennt
-   CPU, Speicher und GPU der App über zwanzig Sekunden. Im Browser sagt
+5. **WENIGE Ebenen** (seit 1.0.43). Regel 1–4 allein reichten nicht: Mit 1.0.42 lag der
+   Hauptstrang bei 2,5 % — aber der **Compositor-Faden** bei 45 % eines Kerns und der
+   Grafikprozess bei 64 %, weil rund zweihundert Ebenen in jedem Bild einzeln fortgeschrieben
+   und gezeichnet werden wollen. Deshalb: Schnee ist **drei Lagen** (ein Bild voller Flocken,
+   gekachelt, das um seine Höhe läuft) statt 48 Flocken; die 32 Lichter atmen in **vier
+   Gruppen**; Baumlichter ebenso; das kleine Ortssymbol **steht still**, bewegt wird nur die
+   Silhouette. Ein Test begrenzt die Schicht auf fünfzig bewegte Ebenen.
+6. **Keine Deckkraft auf einem Kasten, in dem sich etwas bewegt** — die Grafikeinheit müsste
+   ihn in jedem Bild erst gesondert zeichnen und dann abblenden. Die Blässe der Ortssilhouette
+   sitzt deshalb an den Blättern (`--ort-deck`).
+7. **Liegt der Schoner, ruht das Dashboard** (`body.schoner-deckt`, `content-visibility:
+   hidden`). Was dort animiert — die Pfeile der Energiekarte etwa —, lief unsichtbar weiter:
+   ohne jede sichtbare Bewegung 20 % Renderer und 30 % Grafikprozess, mit ruhendem Dashboard
+   3 % und 1 %. Gesetzt wird erst nach der Blende, weggenommen **vor** `schoner.verbergen()`.
+8. **Nachmessen statt behaupten**: `werkzeuge/last-messen.ps1` auf dem Panel (per SSH) nennt
+   CPU, Speicher und GPU der App. Welcher **Faden** rechnet, ist die eigentliche Auskunft
+   (`CrRendererMain` = Hauptstrang, `Compositor`, `CrGpuMain`) — und einzelne Verdächtige lassen
+   sich ohne neue Version prüfen: `/api/theme/import` nimmt einen CSS-Zusatz (`extraCss`), der
+   nach zehn Sekunden auf der Wand gilt; danach `/api/theme/reset`. Im Browser sagt
    `document.getAnimations()`, ob ein Ziel ein `SVGElement` ist.
 
 **Die Auftritte kommen gewürfelt** (`Auftritte` in `anlass.js`). Gewünscht: *„dass ab und zu, in
@@ -1573,7 +1590,7 @@ das Standbild statt der Wolken.
 npm test
 ```
 
-690 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
+692 Tests über Zustandslogik, Bildschirmschoner, Innen/Außen-Erkennung, Zugangsschutz, Kartenaufbau, Akkumeldung,
 Dashboard-Austausch, die Live-Verbindung und den PowerShell-Vorspann. Electron wird dafür
 nicht gebraucht; sechs Tests werden außerhalb von Windows übersprungen.
 

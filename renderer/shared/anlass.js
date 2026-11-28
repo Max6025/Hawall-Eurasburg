@@ -38,7 +38,7 @@
 (function (global) {
   'use strict';
 
-  const FLOCKEN_VORGABE = 34;
+  const FLOCKEN_VORGABE = 60;
   // Die Girlande hängt in so vielen Bögen. Die Zahl steht auch im CSS nirgends ein zweites Mal:
   // Alle Lagen (Schleifen, Lichter, Anhänger) werden hier in Prozent ausgerechnet.
   const BOEGEN = 8;
@@ -117,33 +117,67 @@
     return { anlass, advent, figur, schild, signatur: [anlass, advent, figur, schild.gross, schild.klein].join('|') };
   }
 
+  // --- Der Schnee ---------------------------------------------------------------------------------
+  //
+  // DREI LAGEN STATT ACHTUNDVIERZIG FLOCKEN. In 1.0.42 war jede Flocke ein eigenes Element mit
+  // eigener Animation -- sauber auf der Grafikeinheit, der Hauptstrang lag bei 2,5 %. Aber auf
+  // dem Surface Go gemessen kostete allein der COMPOSITOR-Faden 45 % eines Kerns und der
+  // Grafikprozess 64 %: Rund zweihundert Ebenen wollen in jedem Bild einzeln fortgeschrieben,
+  // sortiert und gezeichnet werden. Was flüssig sein soll, darf nicht viele Ebenen bewegen,
+  // sondern wenige.
+  //
+  // Eine Lage ist ein bildschirmgroßes Bild voller Flocken, zweimal untereinander gekachelt,
+  // das einmal um seine Höhe nach unten läuft und nahtlos von vorn beginnt. Drei Lagen in drei
+  // Tiefen (fern klein und langsam, nah groß und schnell), jede schwankt dazu langsam seitlich
+  // -- das Schwanken liegt auf einem eigenen Element darum, sonst spränge die Lage am Ende der
+  // Runde zur Seite. Macht sechs bewegte Ebenen für beliebig viel Schnee.
+  //
+  // Der Zufall läuft weiter nur beim Aufbau: Wo die Flocken in ihrer Lage sitzen, wird einmal
+  // gewürfelt und als Bild (SVG in einer Data-URL) abgelegt.
+
+  const SCHNEE_LAGEN = [
+    { tiefe: 0, anteil: 0.5,  rMin: 2,   rMax: 3,   dkMin: 0.5,  dkMax: 0.65, dauer: 30, schwank: 2.2, takt: 17 },
+    { tiefe: 1, anteil: 0.32, rMin: 3.5, rMax: 5,   dkMin: 0.7,  dkMax: 0.85, dauer: 19, schwank: 3.4, takt: 13 },
+    { tiefe: 2, anteil: 0.18, rMin: 5.5, rMax: 8.5, dkMin: 0.88, dkMax: 1,    dauer: 12, schwank: 5,   takt: 9 }
+  ];
+  // Das Bild einer Lage misst 1680 x 1000 Einheiten: 1000 sind die Bildschirmhöhe, 1680 die
+  // Breite samt dem Rand, um den die Lage seitlich schwankt (112vw).
+  const SCHNEE_B = 1680, SCHNEE_H = 1000;
+
   /**
-   * Die Flocken als Daten. `zufall` ist austauschbar, damit der Test dieselben Flocken zweimal
-   * bekommt.
-   *
-   * Drei Tiefen: Ferne Flocken sind klein, blass und langsam, nahe groß und schnell. Ohne das
-   * fällt der Schnee wie ein Vorhang; mit ihm hat das Bild Raum.
+   * Die Flocken als Daten, je Lage. `zufall` ist austauschbar, damit der Test dieselben Flocken
+   * zweimal bekommt. `anzahl` ist die Gesamtzahl über alle drei Lagen.
    */
   function flockenDaten(anzahl, zufall) {
     const r = zufall || Math.random;
     const z = (a, b) => a + r() * (b - a);
     const n = Number(anzahl) > 0 ? Math.round(Number(anzahl)) : FLOCKEN_VORGABE;
-    const flocken = [];
-    for (let i = 0; i < n; i++) {
-      const tiefe = i % 3; // 0 fern, 1 mittel, 2 nah
-      const dauer = [z(22, 30), z(15, 21), z(10, 14)][tiefe];
-      flocken.push({
-        tiefe,
-        links: +z(0, 100).toFixed(1),                       // vw
-        groesse: +([z(0.4, 0.6), z(0.7, 1.0), z(1.1, 1.7)][tiefe]).toFixed(2), // vh
-        deckkraft: +([z(0.45, 0.6), z(0.65, 0.8), z(0.85, 0.98)][tiefe]).toFixed(2),
-        dauer: +dauer.toFixed(1),                            // s
-        // Negativ: Der Schnee fällt schon, wenn die Schicht erscheint, statt oben zu starten.
-        versatz: +(-z(0, dauer)).toFixed(1),
-        drift: +z(-6, 6).toFixed(1)                          // vw, seitliches Treiben
-      });
-    }
-    return flocken;
+    return SCHNEE_LAGEN.map(lage => {
+      const stueck = Math.max(1, Math.round(n * lage.anteil));
+      const flocken = [];
+      for (let i = 0; i < stueck; i++) {
+        flocken.push({ x: +z(0, SCHNEE_B).toFixed(0), y: +z(0, SCHNEE_H).toFixed(0),
+          r: +z(lage.rMin, lage.rMax).toFixed(1), deckkraft: +z(lage.dkMin, lage.dkMax).toFixed(2) });
+      }
+      return { tiefe: lage.tiefe, dauer: lage.dauer, schwank: lage.schwank, takt: lage.takt, flocken };
+    });
+  }
+
+  /** Die drei Schneelagen als HTML. */
+  function schneeHtml(anzahl, zufall) {
+    return flockenDaten(anzahl, zufall).map(lage => {
+      // Eine Flocke am oberen oder unteren Rand wird auf der Gegenseite wiederholt, sonst ist sie
+      // an der Naht der Kachel abgeschnitten.
+      const kreis = (f, y) => `<circle cx="${f.x}" cy="${y}" r="${f.r}" fill="url(#f)" opacity="${f.deckkraft}"/>`;
+      const kreise = lage.flocken.map(f =>
+        kreis(f, f.y) + (f.y < f.r ? kreis(f, f.y + SCHNEE_H) : '') + (f.y > SCHNEE_H - f.r ? kreis(f, f.y - SCHNEE_H) : '')).join('');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SCHNEE_B} ${SCHNEE_H}" preserveAspectRatio="none">` +
+        `<defs><radialGradient id="f"><stop offset="0" stop-color="#fff"/><stop offset=".5" stop-color="#fff" stop-opacity=".9"/>` +
+        `<stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>${kreise}</svg>`;
+      return `<div class="anlass-schwank anlass-bewegt" style="--schwank:${lage.schwank}vw;--takt:${lage.takt}s">` +
+        `<div class="anlass-schneelage anlass-bewegt t${lage.tiefe}" data-flocken="${lage.flocken.length}" ` +
+        `style="--dauer:${lage.dauer}s;background-image:url('data:image/svg+xml,${encodeURIComponent(svg)}')"></div></div>`;
+    }).join('');
   }
 
   // --- Die Zeichnungen ----------------------------------------------------------------------------
@@ -184,6 +218,17 @@
     const dreh = ursprung ? `;transform-origin:${pz(ursprung[0] - x, w)} ${pz(ursprung[1] - y, t)}` : '';
     return `<i class="anlass-teil anlass-bewegt ${klasse}" style="left:${pz(x, b)};top:${pz(y, h)};width:${pz(w, b)};height:${pz(t, h)}${dreh}">` +
       `<svg viewBox="${x} ${y} ${w} ${t}" xmlns="http://www.w3.org/2000/svg">${zeichnung}</svg></i>`;
+  }
+  /**
+   * Mehrere Dinge als EIN bewegtes Teil: ein kastengroßes Element, das als Ganzes blinkt, mit
+   * stehenden Punkten darin. Zehn Baumlichter in vier Gruppen sind vier Ebenen statt zehn.
+   */
+  function gruppe(klasse, inhalt) {
+    return `<i class="anlass-teil anlass-gruppe anlass-bewegt ${klasse}" style="left:0;top:0;width:100%;height:100%">${inhalt}</i>`;
+  }
+  /** Ein stehender runder Punkt in einer Gruppe. */
+  function punkt(b, h, cx, cy, r, farbe) {
+    return `<b class="anlass-punkt" style="left:${pz(cx - r, b)};top:${pz(cy - r, h)};width:${pz(2 * r, b)};height:${pz(2 * r, h)};background:${farbe}"></b>`;
   }
   /** Ein bewegter runder Fleck ohne eigene Zeichnung: Licht, Nase, Rauch, Funke. */
   function fleck(klasse, b, h, cx, cy, r, farbe) {
@@ -255,8 +300,8 @@
     `<path d="M168 38 Q210 52 244 40 Q270 34 300 36" stroke="${GOLD}" stroke-width="1.4" fill="none" opacity=".85"/>` +
     rentier(180, false) + rentier(250, true),
     fleck('anlass-nase', 330, 96, 318.5, 28, 3.6, '#ff3b30') +
-    fleck('anlass-funke f1', 330, 96, 14, 46, 2.8, GOLD) + fleck('anlass-funke f2', 330, 96, 34, 60, 2.2, GOLD) +
-    fleck('anlass-funke f3', 330, 96, 52, 40, 3.2, GOLD) + fleck('anlass-funke f2', 330, 96, 70, 66, 2, GOLD));
+    gruppe('anlass-funke', punkt(330, 96, 14, 46, 2.8, GOLD) + punkt(330, 96, 34, 60, 2.2, GOLD) +
+      punkt(330, 96, 52, 40, 3.2, GOLD) + punkt(330, 96, 70, 66, 2, GOLD)));
 
   // Der Adventskranz: vier Kerzen, so viele brennen, wie Advent ist. Die Flammen sind die
   // bewegten Teile, jede ein eigenes kleines Bild mit dem Drehpunkt am Docht.
@@ -300,7 +345,8 @@
     `<path d="M40 32 Q46 26 50 30 Q54 26 60 32 Q54 36 50 33 Q46 36 40 32Z" fill="#fff" opacity=".92"/>` +
     [[42, 46, ROT], [58, 44, '#3d7df0'], [30, 76, '#b04bd6'], [70, 74, ROT], [50, 68, GOLD], [20, 122, ROT], [38, 124, '#3d7df0'], [58, 126, '#b04bd6'], [78, 124, GOLD]]
       .map(([x, y, f]) => `<circle cx="${x}" cy="${y}" r="4.2" fill="${f}"/><circle cx="${x - 1.3}" cy="${y - 1.4}" r="1.2" fill="#fff" opacity=".7"/>`).join(''),
-    BAUM_LICHTER.map(([x, y, f], i) => fleck(`anlass-baumlicht b${i % 4}`, 100, 150, x, y, 2.8, f)).join('') +
+    [0, 1, 2, 3].map(k => gruppe(`anlass-baumlicht b${k}`,
+      BAUM_LICHTER.filter((_, i) => i % 4 === k).map(([x, y, f]) => punkt(100, 150, x, y, 2.8, f)).join(''))).join('') +
     teil('anlass-stern', 100, 150, 35, -1, 30, 28,
       `<path d="M50 0 L53.6 9.4 L63.6 10 L55.8 16.4 L58.4 26 L50 20.6 L41.6 26 L44.2 16.4 L36.4 10 L46.4 9.4Z" fill="${GOLD}"/>`, [50, 13]));
 
@@ -318,8 +364,8 @@
 
   // Das Häuschen: Schnee auf dem Dach, zwei warme Fenster, ein Kranz an der Tür -- und aus dem
   // Kamin steigt Rauch. Bewegt: der Rauch (hinter dem Haus) und der Schein in den Fenstern.
-  const fensterSchein = (x, y) => teil('anlass-fenster', 140, 112, x, y, 18, 18,
-    `<rect x="${x}" y="${y}" width="18" height="18" rx="1.5" fill="#fff6c4"/><path d="M${x + 9} ${y} v18 M${x} ${y + 9} h18" stroke="#fff" stroke-width="2"/>`);
+  // Beide Fenster sind EIN Teil: Sie leuchten im selben Takt, also reicht eine Ebene.
+  const fensterBild = (x, y) => `<rect x="${x}" y="${y}" width="18" height="18" rx="1.5" fill="#fff6c4"/><path d="M${x + 9} ${y} v18 M${x} ${y + 9} h18" stroke="#fff" stroke-width="2"/>`;
   const HAUS = bild(140, 112,
     `<rect x="94" y="20" width="18" height="30" fill="#9c4a3a"/><rect x="91" y="16" width="24" height="7" rx="3.5" fill="#fff"/>` +
     `<rect x="20" y="56" width="100" height="54" rx="3" fill="#c96f4e"/>` +
@@ -332,7 +378,7 @@
       `<rect x="${x - 3}" y="${y - 3}" width="24" height="24" rx="3" fill="#fff"/>` +
       `<rect x="${x}" y="${y}" width="18" height="18" rx="1.5" fill="#f0b83c"/>` +
       `<path d="M${x + 9} ${y} v18 M${x} ${y + 9} h18" stroke="#fff" stroke-width="2"/>`).join(''),
-    fensterSchein(30, 74) + fensterSchein(92, 74),
+    teil('anlass-fenster', 140, 112, 30, 74, 80, 18, fensterBild(30, 74) + fensterBild(92, 74)),
     ['r1', 'r2', 'r3'].map(k => fleck('anlass-rauch ' + k, 140, 112, 103, 14, 5.4, '#fff')).join(''));
 
   // Der Schneemann: Zylinder, Karottennase, roter Schal -- und ein Arm, der winkt (hinter dem
@@ -430,12 +476,18 @@
     for (let i = 0; i < BOEGEN; i++) pfad += `M${i * 100} 8 Q${i * 100 + 50} 52 ${i * 100 + 100} 8 `;
     let html = `<svg class="anlass-gruen" viewBox="0 0 ${BOEGEN * 100} 60" preserveAspectRatio="none" aria-hidden="true">` +
       `<path class="g1" d="${pfad}"/><path class="g2" d="${pfad}"/><path class="g3" d="${pfad}"/><path class="g4" d="${pfad}"/></svg>`;
+    // Die Lichter: 32 Birnen, aber nur VIER bewegte Ebenen -- je Takt eine Gruppe, die als
+    // Ganzes atmet. Einzeln waeren es 32 Ebenen fuer dasselbe Bild.
+    const lichter = ['', '', '', ''];
     for (let i = 0; i < BOEGEN; i++) {
       [0.16, 0.38, 0.62, 0.84].forEach((t, k) => {
         const farbe = LICHTER_FARBEN[(i * 4 + k) % LICHTER_FARBEN.length];
-        html += `<span class="anlass-birne anlass-bewegt b${(i + k) % 4}" style="left:${((i + t) * b).toFixed(2)}%;` +
+        lichter[(i + k) % 4] += `<span class="anlass-birne" style="left:${((i + t) * b).toFixed(2)}%;` +
           `top:${(bogenTiefe(t) * 100).toFixed(1)}%;--birne:${farbe}"></span>`;
       });
+    }
+    lichter.forEach((birnen, k) => { html += `<div class="anlass-lichter anlass-bewegt b${k}">${birnen}</div>`; });
+    for (let i = 0; i < BOEGEN; i++) {
       // Der Anhänger am tiefsten Punkt: eigene Fadenlänge, eigene Größe, eigener Takt.
       html += `<span class="anlass-haenger anlass-bewegt" style="left:${((i + 0.5) * b).toFixed(2)}%;top:${(bogenTiefe(0.5) * 100).toFixed(1)}%;` +
         `--faden:${z(0.2, 1.2).toFixed(2)}vh;--gr:${z(2.8, 3.5).toFixed(2)}vh;--pd:${z(2.6, 4.4).toFixed(1)}s;--pv:${(-z(0, 4)).toFixed(1)}s">` +
@@ -672,9 +724,7 @@
     if (!zustand || zustand.anlass !== 'weihnachten') return '';
     const opt = optionen || {};
     const gross = opt.szene === 'gross';
-    const flocken = flockenDaten(opt.flocken, opt.zufall).map(f =>
-      `<span class="anlass-flocke anlass-bewegt t${f.tiefe}" style="left:${f.links}vw;--gr:${f.groesse}vh;--dk:${f.deckkraft};` +
-      `--dauer:${f.dauer}s;--versatz:${f.versatz}s;--drift:${f.drift}vw"></span>`).join('');
+    const flocken = schneeHtml(opt.flocken, opt.zufall);
     const figur = zustand.figur === 'nikolaus' ? NIKOLAUS : WEIHNACHTSMANN;
     const schild = zustand.schild || schildText(new Date());
     const kranz = adventskranzSvg(zustand.advent);
@@ -728,7 +778,7 @@
   const BUEHNE_TOENE_WEIHNACHTEN = [[348, 366], [38, 50], [128, 152], [205, 225], [305, 328]];
 
   const api = {
-    anlassErmitteln, adventStand, figurFuer, schildText, anlassZustand, flockenDaten,
+    anlassErmitteln, adventStand, figurFuer, schildText, anlassZustand, flockenDaten, schneeHtml,
     adventskranzSvg, girlandeHtml, schichtHtml, schichtSetzen,
     AUFTRITTE, auftrittWaehlen, auftrittWuerfeln, Auftritte, tonSpielen,
     FLOCKEN_VORGABE, BOEGEN, BUEHNE_TOENE_WEIHNACHTEN
