@@ -3505,18 +3505,22 @@
       const punkte = (arten) => arten.map(a =>
         `<span class="waste-dot" style="background:${wasteColor(a, eigeneFarben)}"></span>`).join('');
 
-      // DER TAG STEHT UEBER DEM WERT, nicht als Chip in der Ecke. Gemeldet wurde "man erkennt
-      // nicht auf Anhieb, an welchem Tag das jetzt ist" -- und das war richtig: Die Tonnennamen
-      // nahmen die halbe Karte ein, das Datum sass in einem Chip von zwoelf Pixeln.
+      // DER TAG STEHT GROSS NEBEN DEM SYMBOL, nicht als Chip in der Ecke. Gemeldet wurde "man
+      // erkennt nicht auf Anhieb, an welchem Tag das jetzt ist" -- und das war richtig: Die
+      // Tonnennamen nahmen die halbe Karte ein, das Datum sass in einem Chip von zwoelf Pixeln.
       //
-      // Die Reihenfolge bleibt trotzdem "welche Tonne, und wann": Die Tonnen sind die groesste
-      // Schrift, der Tag die zweitgroesste. Und zweimal steht er nicht -- der Chip ist weg.
+      // Bis 1.0.51 hatte er eine EIGENE Zeile unter dem Symbol. Auf einer Karte von zwei Zeilen
+      // Hoehe waren das fuenf Stockwerke (Symbol, Tag, Tonnen, Name, Liste), und im
+      // Weihnachtsdesign -- niedrigere Zeilen, groessere Schrift -- lief die Tonnenzeile unter
+      // den Namen: "die Schrift ist abgeschnitten". Der Wunsch dazu war ausdruecklich NICHT eine
+      // kleinere Schrift, sondern der Tag hoch neben den Muelleimer und der Rest nachgerueckt.
+      // Die Symbolzeile war ohnehin halb leer.
       card.innerHTML = `
-        <div class="row">
+        <div class="row waste-kopf">
           <span class="icon">${symbolFuer(settings, ICONS.trash)}</span>
+          ${naechster ? `<div class="waste-tag${wasteBald(naechster.start) ? ' waste-bald' : ''}">${esc(wasteDateLabel(naechster.start))}</div>` : ''}
         </div>
         ${naechster ? `
-          <div class="waste-tag${wasteBald(naechster.start) ? ' waste-bald' : ''}">${esc(wasteDateLabel(naechster.start))}</div>
           <div class="value waste-art">${esc(naechster.arten.join(' · '))}</div>
           <div class="name">${name}</div>
           <div class="waste-list">

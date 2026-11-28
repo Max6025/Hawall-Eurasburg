@@ -800,6 +800,12 @@ sehen ist, gehört dagegen ausdrücklich **nicht** hierher — das ist Sache des
   Klassen und gewinnt mit `23cqmin`; die Tonnennamen rendern deshalb seit immer mit 22 px statt
   mit den vorgesehenen 12. Eine Regel, die nie greift, ist dasselbe wie keine — dieselbe Lehre
   wie bei `gauge.baseColor`. Die Größe steht jetzt unter `.card.type-waste .value.waste-art`.
+  **Seit 1.0.52 steht der Tag NEBEN dem Symbol**, nicht mehr in einer eigenen Zeile darunter.
+  Gemeldet mit Foto: *„beim Kalender ist die Schrift abgeschnitten"* — im Weihnachtsdesign
+  (niedrigere Zeilen, größere Schrift) lief die Tonnenzeile unter den Namen. Der Wunsch dazu:
+  *„Mittwoch 02.12. neben den Mülleimer in die Höhe und den Rest weiter oben. Die Schriftart
+  kleiner zu machen, ist nicht so meine."* Fünf Stockwerke auf zwei Rasterzeilen waren eines zu
+  viel, und die Symbolzeile war halb leer. Gilt in beiden Designs — es ist dasselbe Markup.
   Was **davon unberührt bleibt** (und der Weg dorthin, zur Einordnung): Ganz früher war der
   **Kartenname** die größte Schrift — aus zwei Metern las man „Mülltermine" und sonst nichts.
   Seitdem gilt dieselbe Anatomie wie bei jeder anderen Karte, nur die Rangfolge von Tag und

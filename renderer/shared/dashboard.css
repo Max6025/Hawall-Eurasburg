@@ -1064,6 +1064,20 @@ body.light-theme .card .ort-silhouette { opacity: 1; --ort-deck: 0.09; }
   font-variant-numeric: tabular-nums;
 }
 .card.type-waste .waste-tag.waste-bald { color: var(--kachel-akzent, var(--text)); }
+/* Der Tag steht NEBEN dem Symbol (seit 1.0.52), nicht in einer eigenen Zeile darunter -- das
+   spart ein Stockwerk, und die Tonnenzeile rueckt nach, statt unter den Namen zu laufen. Die
+   Zeile verteilt deshalb nicht (space-between), sondern reiht von links; der Tag darf
+   schrumpfen und kuerzt notfalls mit Punkten, das Symbol nie. */
+.card.type-waste .row.waste-kopf { justify-content: flex-start; gap: clamp(0.6vh, 5cqmin, 1.6vh); }
+.card.type-waste .row.waste-kopf .icon { flex-shrink: 0; }
+.card.type-waste .row.waste-kopf .waste-tag {
+  min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card.type-waste .value.waste-art {
+  font-size: clamp(1.3vh, 14cqmin, 4.6vh);
+  font-weight: 500; color: color-mix(in srgb, var(--muted) 30%, var(--text));
+  margin-top: 0.3vh;
+}
 .dt-energie .ed { width: 100%; height: 100%; }
 /* Der Zeiger nur dort, wo ein Tippen auch etwas tut. Auf der Wand ist er ohnehin aus
    (body.wandanzeige), aber in der Live-Ansicht im Browser ist er die einzige Ankuendigung,

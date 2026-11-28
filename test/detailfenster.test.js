@@ -396,6 +396,23 @@ test('der Tag steht nur EINMAL auf der Karte', () => {
     'der naechste Tag darf nur an einer Stelle gesetzt werden');
 });
 
+test('der Tag steht NEBEN dem Symbol, nicht in einer eigenen Zeile darunter', () => {
+  // Gemeldet am 2026-11-28 mit Foto: "beim Kalender ist die Schrift abgeschnitten" -- die
+  // Tonnenzeile lief im Weihnachtsdesign unter den Namen. Gewuenscht war ausdruecklich keine
+  // kleinere Schrift, sondern der Tag hoch neben den Muelleimer. Faellt er wieder aus der
+  // Symbolzeile heraus, hat die Karte ein Stockwerk zu viel.
+  const render = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'shared', 'dashboard-render.js'), 'utf8');
+  const i = render.indexOf("} else if (type === 'waste') {");
+  const block = render.slice(i, render.indexOf("} else if (type === 'photo')", i));
+  const kopf = /<div class="row waste-kopf">([\s\S]*?)<\/div>\s*\$\{naechster \? `\s*<div class="value waste-art">/.exec(block);
+  assert.ok(kopf, 'die Kopfzeile der Muellkarte fehlt oder die Tonnenzeile folgt nicht direkt darauf');
+  assert.match(kopf[1], /class="icon"/);
+  assert.match(kopf[1], /class="waste-tag/);
+  const css = fs.readFileSync(path.join(__dirname, '..', 'renderer', 'shared', 'dashboard.css'), 'utf8');
+  // Von links gereiht, nicht auf die Breite verteilt -- sonst klebt der Tag am rechten Rand.
+  assert.match(css, /\.card\.type-waste \.row\.waste-kopf \{[^}]*justify-content:\s*flex-start/);
+});
+
 // --- Wie weit der Verlauf zurueckreicht ----------------------------------------------------
 
 test('hinter einer Wertkarte steht EINE Stunde', () => {
