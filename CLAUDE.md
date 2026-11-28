@@ -1539,7 +1539,26 @@ die ganze Zeichnung neu. Fünf Regeln, jede mit Test:
    hidden`). Was dort animiert — die Pfeile der Energiekarte etwa —, lief unsichtbar weiter:
    ohne jede sichtbare Bewegung 20 % Renderer und 30 % Grafikprozess, mit ruhendem Dashboard
    3 % und 1 %. Gesetzt wird erst nach der Blende, weggenommen **vor** `schoner.verbergen()`.
-8. **Nachmessen statt behaupten**: `werkzeuge/last-messen.ps1` auf dem Panel (per SSH) nennt
+8. **Eine GROSSE bewegte Ebene in einer Karte mit runden Ecken ist teuer, kleine sind es
+   nicht.** In 1.0.43 fiel der Schnee um den Schneemann der Außen-Karten als eine Lage, doppelt
+   so hoch wie die Silhouette. Sie muss an den runden Ecken der Karte abgeschnitten werden, und
+   das kostet nach Fläche: Die Bildrate fiel von 60 auf 38. Ohne diese eine Lage: 59,8. Jetzt
+   fallen dort drei kleine Flocken — wie der Rauch des Hauses, der fast nichts kostet.
+9. **`requestAnimationFrame` zählt die falschen Bilder.** Es zählt die des Hauptstrangs; die
+   Animationen laufen aber auf dem Compositor. Gemessen am selben Stand: 24 Bilder pro Sekunde
+   laut `requestAnimationFrame`, **59,3 laut Chromium selbst** (`Display::DrawAndSwap`). Die
+   Wahrheit steht in `GET /api/debug/bildfluss` (zeichnet mit `contentTracing` auf und zählt die
+   Ereignisse); `/api/anzeige/bildrate` bleibt als grobe Auskunft über den Hauptstrang.
+
+Der Stand nach alledem, auf dem Surface Go im Bildschirmschoner gemessen (1.0.46):
+**59,3–59,7 gezeichnete Bilder pro Sekunde**, Hauptstrang 3 %, Compositor 26 %, Grafikprozess
+49 % eines Kerns. Zum Vergleich: 1.0.41 lag bei 198 %, das Alltagsdesign (Bühne mit
+Weichzeichner, Glaskarten mit `backdrop-filter`) liegt bei rund 170 % — das Weihnachtsdesign ist
+jetzt deutlich sparsamer als der Alltag. Ob Hinlegen und Aufwecken sauber laufen, meldet
+`POST /api/anzeige/zustand-pruefen` (mit `{"wecken":true}` tut die Anzeige vorher, was ein Tipp
+täte).
+
+10. **Nachmessen statt behaupten**: `werkzeuge/last-messen.ps1` auf dem Panel (per SSH) nennt
    CPU, Speicher und GPU der App. Welcher **Faden** rechnet, ist die eigentliche Auskunft
    (`CrRendererMain` = Hauptstrang, `Compositor`, `CrGpuMain`) — und einzelne Verdächtige lassen
    sich ohne neue Version prüfen: `/api/theme/import` nimmt einen CSS-Zusatz (`extraCss`), der
